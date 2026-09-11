@@ -581,8 +581,12 @@ app.get('*', (req, res) => {
 });
 
 // Start Server binding to 0.0.0.0 for Cloud Container support
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`=======================================================`);
-  console.log(`🚀 Bulk Email Automation Server running on port ${PORT}`);
-  console.log(`=======================================================`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`=======================================================`);
+    console.log(`🚀 Bulk Email Automation Server running on port ${PORT}`);
+    console.log(`=======================================================`);
+  });
+}
+
+module.exports = app;
