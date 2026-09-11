@@ -2,7 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 const xlsx = require('xlsx');
 const nodemailer = require('nodemailer');
 
@@ -14,19 +13,16 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Configure Multer storage for uploads
-const uploadDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
-});
+// Memory storage for file uploads (handles serverless/cloud environments cleanly)
+const storage = multer.memoryStorage();
 const upload = multer({
   storage,
   limits: { fileSize: 25 * 1024 * 1024 } // 25MB max
+});
+
+// Health check endpoint for cloud hosting platforms (Render, Railway, etc.)
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'healthy', uptime: process.uptime() });
 });
 
 // Campaign State in Memory
@@ -88,7 +84,7 @@ function getCampaignSnapshot() {
 }
 
 // ----------------------------------------------------
-// Helper: Helper Email Syntax Validation
+// Helper: Email Syntax Validation
 // ----------------------------------------------------
 function isValidEmail(email) {
   if (!email || typeof email !== 'string') return false;
@@ -159,16 +155,15 @@ app.get('/api/campaign/events', (req, res) => {
 });
 
 // ----------------------------------------------------
-// ENDPOINT: Parse Excel / CSV File
+// ENDPOINT: Parse Excel / CSV File (Direct Memory Parsing)
 // ----------------------------------------------------
 app.post('/api/parse-excel', upload.single('file'), (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ error: 'No file uploaded or file is empty.' });
     }
 
-    const filePath = req.file.path;
-    const workbook = xlsx.readFile(filePath);
+    const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
     const rawData = xlsx.utils.sheet_to_json(sheet, { defval: '' });
@@ -221,7 +216,6 @@ app.post('/api/parse-excel', upload.single('file'), (req, res) => {
     res.json({
       success: true,
       fileName: req.file.originalname,
-      tempFilePath: filePath,
       totalRows: rawData.length,
       validEmails: validCount,
       invalidEmails: invalidCount,
@@ -315,10 +309,10 @@ app.post('/api/campaign/start', upload.array('attachments', 10), async (req, res
       return res.status(400).json({ error: 'Subject is required.' });
     }
 
-    // Process attachments
+    // Process attachments from memory
     const attachments = (req.files || []).map((file) => ({
       filename: file.originalname,
-      path: file.path
+      content: file.buffer
     }));
 
     // Filter valid recipients
@@ -564,9 +558,14 @@ app.get('/api/download-sample-excel', (req, res) => {
   res.send(buf);
 });
 
-// Start Server
-app.listen(PORT, () => {
+// SPA Fallback
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Start Server binding to 0.0.0.0 for Cloud Container support
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`=======================================================`);
-  console.log(`🚀 Bulk Email Automation Server running at http://localhost:${PORT}`);
+  console.log(`🚀 Bulk Email Automation Server running on port ${PORT}`);
   console.log(`=======================================================`);
 });
