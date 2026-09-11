@@ -348,14 +348,15 @@
                 <div id="attachmentList" class="attachment-chips"></div>
               </div>
 
-              <!-- Rate Limiting Delay -->
+              <!-- Rate Limiting Delay & Anti-Spam Jitter -->
               <div class="form-group delay-control">
                 <label for="delaySeconds">
-                  <i class="fa-solid fa-hourglass-half"></i> Delay Between Emails: <span id="delayVal" class="text-accent">2.0s</span>
+                  <i class="fa-solid fa-shield-halved text-success"></i> Safe Pacing Delay: <span id="delayVal" class="text-accent">3.0s</span>
+                  <span class="badge-cell valid" style="margin-left:auto; font-size:0.7rem;"><i class="fa-solid fa-bolt"></i> Anti-Spam Jitter ON</span>
                 </label>
-                <input type="range" id="delaySlider" min="0.5" max="10" step="0.5" value="2.0">
+                <input type="range" id="delaySlider" min="1.0" max="10" step="0.5" value="3.0">
                 <div class="time-estimate">
-                  <small id="estimatedDuration">Estimated time for 1,000 emails: ~33 mins</small>
+                  <small id="estimatedDuration">Estimated time for 1,000 emails: ~50 mins (Natural safe delivery)</small>
                 </div>
               </div>
             </div>

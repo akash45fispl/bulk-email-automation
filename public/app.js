@@ -29,10 +29,10 @@ document.addEventListener('DOMContentLoaded', () => {
       sampleRows: []
     },
     message: {
-      subject: 'Special Announcement for {{Name}}',
-      body: '<p>Dear <strong>{{Name}}</strong>,</p>\n<p>We are thrilled to reach out to you from <strong>{{Company}}</strong> with some exciting news.</p>\n<p>Best regards,<br>The Team</p>',
+      subject: 'Important update for {{Name}} at {{Company}}',
+      body: '<p>Dear <strong>{{Name}}</strong>,</p>\n\n<p>I hope this email finds you well at <strong>{{Company}}</strong>.</p>\n\n<p>I am reaching out regarding our recent project updates and opportunities tailored for your team.</p>\n\n<p>Please let me know if you would like to connect for a quick 5-minute discussion this week.</p>\n\n<br>\n<p>Warm regards,<br><strong>Akash</strong><br><small style="color: #64748b;">If you no longer wish to receive updates, reply with "unsubscribe".</small></p>',
       isHtml: true,
-      delaySeconds: 2.0,
+      delaySeconds: 3.0,
       attachments: []
     },
     campaign: {

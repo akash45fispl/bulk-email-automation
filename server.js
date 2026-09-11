@@ -424,14 +424,31 @@ async function runCampaignQueue() {
       // Personalized subject & body
       const personalizedSubject = replaceVariables(subject, clientData);
       const personalizedHtml = htmlBody ? replaceVariables(htmlBody, clientData) : undefined;
-      const personalizedText = textBody ? replaceVariables(textBody, clientData) : undefined;
+      
+      // Generate clean plain text version if missing (essential for 99% spam score)
+      let personalizedText = textBody ? replaceVariables(textBody, clientData) : undefined;
+      if (!personalizedText && personalizedHtml) {
+        personalizedText = personalizedHtml
+          .replace(/<br\s*[\/]?>/gi, '\n')
+          .replace(/<\/p>/gi, '\n\n')
+          .replace(/<[^>]+>/gi, '')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&amp;/g, '&')
+          .trim();
+      }
 
       await transporter.sendMail({
         from: fromName,
         to: recipientEmail,
+        replyTo: smtp.fromEmail || smtp.user,
         subject: personalizedSubject,
         html: personalizedHtml,
         text: personalizedText,
+        headers: {
+          'List-Unsubscribe': `<mailto:${smtp.user}?subject=unsubscribe>`,
+          'X-Mailer': 'AutoMailer PRO',
+          'X-Campaign-ID': activeCampaign.id
+        },
         attachments: attachments.length > 0 ? attachments : undefined
       });
 
@@ -456,9 +473,11 @@ async function runCampaignQueue() {
       currentRecipient: recipient
     });
 
-    // Rate Limiting Throttling Delay
+    // Anti-Spam Rate Limiting with Natural Jitter (Random variation avoids robotic spam filter detection)
     if (i < activeCampaign.recipients.length - 1 && activeCampaign.status === 'running') {
-      await new Promise((res) => setTimeout(res, delayMs));
+      const jitter = Math.floor(Math.random() * 1000) - 300; // -300ms to +700ms random variation
+      const actualDelay = Math.max(800, delayMs + jitter);
+      await new Promise((res) => setTimeout(res, actualDelay));
     }
   }
 
