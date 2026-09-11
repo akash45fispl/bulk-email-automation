@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoMailer Pro — Bulk Email Automation Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dark-theme">
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo-wrapper">
+        <div class="logo-icon">
+          <i class="fa-solid fa-paper-plane"></i>
+        </div>
+        <div class="logo-text">
+          <h1>AutoMailer <span>PRO</span></h1>
+          <p class="tagline">Enterprise Excel-to-Email Automation Engine</p>
+        </div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="badge-status" id="smtpStatusBadge">
+        <span class="status-dot disconnected"></span>
+        <span class="status-text">SMTP Not Configured</span>
+      </div>
+      <a href="/api/download-sample-excel" class="btn btn-secondary btn-sm" download>
+        <i class="fa-solid fa-file-excel"></i> Sample Excel
+      </a>
+      <button class="btn btn-outline btn-sm" id="btnHelpModal">
+        <i class="fa-regular fa-circle-question"></i> Guide
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-container">
+    <!-- Stepper Navigation -->
+    <nav class="stepper-nav">
+      <button class="step-btn active" data-step="1">
+        <span class="step-num">1</span>
+        <span class="step-label">SMTP Config</span>
+      </button>
+      <div class="step-divider"></div>
+      <button class="step-btn" data-step="2">
+        <span class="step-num">2</span>
+        <span class="step-label">Upload Excel</span>
+      </button>
+      <div class="step-divider"></div>
+      <button class="step-btn" data-step="3">
+        <span class="step-num">3</span>
+        <span class="step-label">Compose Message</span>
+      </button>
+      <div class="step-divider"></div>
+      <button class="step-btn" data-step="4">
+        <span class="step-num">4</span>
+        <span class="step-label">Launch Campaign</span>
+      </button>
+    </nav>
+
+    <!-- STEP 1: SMTP CONFIGURATION -->
+    <section class="step-pane active" id="step1">
+      <div class="pane-header">
+        <div>
+          <h2><i class="fa-solid fa-server"></i> Email Provider & SMTP Settings</h2>
+          <p class="subtitle">Connect your free email account (Gmail, Outlook, Brevo, or Custom SMTP) to send messages safely.</p>
+        </div>
+        <div class="preset-group">
+          <span class="preset-label">Quick Presets:</span>
+          <button class="btn-preset active" data-preset="gmail"><i class="fa-brands fa-google"></i> Gmail</button>
+          <button class="btn-preset" data-preset="outlook"><i class="fa-brands fa-microsoft"></i> Outlook</button>
+          <button class="btn-preset" data-preset="brevo"><i class="fa-solid fa-bolt"></i> Brevo (Free 300/day)</button>
+          <button class="btn-preset" data-preset="custom"><i class="fa-solid fa-sliders"></i> Custom</button>
+        </div>
+      </div>
+
+      <div class="grid-2-col">
+        <!-- SMTP Form Card -->
+        <div class="card glass-card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-shield-halved"></i> Credentials & Server</h3>
+          </div>
+          <div class="card-body form-grid">
+            <div class="form-group">
+              <label for="smtpHost">SMTP Server Host</label>
+              <div class="input-icon-wrap">
+                <i class="fa-solid fa-globe"></i>
+                <input type="text" id="smtpHost" value="smtp.gmail.com" placeholder="e.g. smtp.gmail.com">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="smtpPort">Port & Security</label>
+              <div class="input-group-row">
+                <input type="number" id="smtpPort" value="587" placeholder="587 or 465" style="max-width: 120px;">
+                <select id="smtpSecure">
+                  <option value="false">TLS / STARTTLS (587)</option>
+                  <option value="true">SSL / Secure (465)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="smtpUser">Sender Email / Username</label>
+              <div class="input-icon-wrap">
+                <i class="fa-solid fa-envelope"></i>
+                <input type="email" id="smtpUser" placeholder="your_email@gmail.com">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="smtpPass">
+                Password / App Password
+                <span class="tooltip-trigger" title="For Gmail, use a 16-character App Password, not regular password!"><i class="fa-solid fa-info-circle"></i></span>
+              </label>
+              <div class="input-icon-wrap password-wrap">
+                <i class="fa-solid fa-key"></i>
+                <input type="password" id="smtpPass" placeholder="16-character App Password">
+                <button type="button" class="btn-toggle-pass" id="btnTogglePass"><i class="fa-regular fa-eye"></i></button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="smtpFromName">Display Sender Name (Optional)</label>
+              <div class="input-icon-wrap">
+                <i class="fa-solid fa-user-tag"></i>
+                <input type="text" id="smtpFromName" placeholder="e.g. John from Apex Innovations">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="smtpFromEmail">Reply-To / From Email (Optional)</label>
+              <div class="input-icon-wrap">
+                <i class="fa-solid fa-reply"></i>
+                <input type="email" id="smtpFromEmail" placeholder="e.g. support@company.com">
+              </div>
+            </div>
+          </div>
+          <div class="card-footer">
+            <button class="btn btn-outline" id="btnTestConnection">
+              <i class="fa-solid fa-plug-circle-check"></i> Test Connection
+            </button>
+            <button class="btn btn-primary" id="btnSaveStep1">
+              Next: Upload Excel <i class="fa-solid fa-arrow-right"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Help & Instructions Card -->
+        <div class="card glass-card info-card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-lightbulb"></i> Free SMTP Setup Guide</h3>
+          </div>
+          <div class="card-body">
+            <div class="tip-box">
+              <h4><i class="fa-brands fa-google"></i> Gmail App Password (Free 500/day):</h4>
+              <ol>
+                <li>Go to your Google Account -> <strong>Security</strong>.</li>
+                <li>Enable <strong>2-Step Verification</strong> if not already active.</li>
+                <li>Search for <strong>"App passwords"</strong> in the top search bar.</li>
+                <li>Create an app named <code>AutoMailer</code> and copy the <strong>16-letter code</strong>.</li>
+                <li>Paste it in the password box on the left.</li>
+              </ol>
+            </div>
+
+            <div class="tip-box mt-3">
+              <h4><i class="fa-solid fa-gauge-high"></i> Recommended Sending Rates:</h4>
+              <p>For 1,000+ client lists, set the delay to <strong>2 - 3 seconds</strong> in Step 3. This avoids spam detection and prevents email providers from temporarily freezing your account.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 2: EXCEL UPLOAD & PREVIEW -->
+    <section class="step-pane" id="step2">
+      <div class="pane-header">
+        <div>
+          <h2><i class="fa-solid fa-file-excel"></i> Import Client Excel / CSV Sheet</h2>
+          <p class="subtitle">Upload your spreadsheet containing client emails. All columns will be converted to dynamic template variables.</p>
+        </div>
+        <div>
+          <button class="btn btn-secondary" id="btnReupload" style="display:none;">
+            <i class="fa-solid fa-rotate"></i> Change File
+          </button>
+        </div>
+      </div>
+
+      <!-- Dropzone Area -->
+      <div class="dropzone-card" id="dropzone">
+        <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" hidden>
+        <div class="dropzone-content">
+          <div class="dropzone-icon">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+          </div>
+          <h3>Drag & Drop your Excel (.xlsx, .xls) or .CSV file here</h3>
+          <p>or click to browse files from your computer</p>
+          <div class="dropzone-hints">
+            <span><i class="fa-solid fa-check"></i> Supports 10,000+ rows</span>
+            <span><i class="fa-solid fa-check"></i> Auto-detects column headers</span>
+            <span><i class="fa-solid fa-check"></i> Cleans invalid emails</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Uploaded Data Section (Hidden until file selected) -->
+      <div id="dataPreviewSection" class="data-preview-section" style="display: none;">
+        <!-- Stats Summary Bar -->
+        <div class="stats-bar">
+          <div class="stat-pill">
+            <span class="stat-icon"><i class="fa-solid fa-file-lines"></i></span>
+            <span class="stat-meta">
+              <label>File Name</label>
+              <strong id="previewFileName">clients.xlsx</strong>
+            </span>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-icon text-success"><i class="fa-solid fa-users"></i></span>
+            <span class="stat-meta">
+              <label>Valid Recipients</label>
+              <strong id="previewValidCount">0</strong>
+            </span>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-icon text-danger"><i class="fa-solid fa-triangle-exclamation"></i></span>
+            <span class="stat-meta">
+              <label>Invalid / Skipped</label>
+              <strong id="previewInvalidCount">0</strong>
+            </span>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-icon text-info"><i class="fa-solid fa-table-columns"></i></span>
+            <span class="stat-meta">
+              <label>Columns Detected</label>
+              <strong id="previewColCount">0</strong>
+            </span>
+          </div>
+        </div>
+
+        <!-- Column Mapping Row -->
+        <div class="mapping-card glass-card">
+          <div class="mapping-header">
+            <h3><i class="fa-solid fa-sliders"></i> Column Configuration</h3>
+            <p>Confirm which column contains recipient email addresses</p>
+          </div>
+          <div class="mapping-body">
+            <div class="form-group inline">
+              <label for="selectEmailColumn"><i class="fa-solid fa-envelope"></i> Recipient Email Column:</label>
+              <select id="selectEmailColumn" class="select-highlight"></select>
+            </div>
+            <div class="form-group inline">
+              <label for="selectNameColumn"><i class="fa-solid fa-user"></i> Primary Name Column:</label>
+              <select id="selectNameColumn"></select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interactive Data Table Preview -->
+        <div class="card glass-card table-card">
+          <div class="table-header-toolbar">
+            <h3><i class="fa-solid fa-list-check"></i> Recipient Preview (First 50 Rows)</h3>
+            <div class="table-search">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="tableFilterInput" placeholder="Filter rows...">
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table" id="previewTable">
+              <thead id="previewTableHead"></thead>
+              <tbody id="previewTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="step-actions">
+          <button class="btn btn-secondary" id="btnBackToStep1">
+            <i class="fa-solid fa-arrow-left"></i> Back
+          </button>
+          <button class="btn btn-primary" id="btnGoToStep3">
+            Next: Compose Message <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 3: COMPOSE MESSAGE & TEMPLATE -->
+    <section class="step-pane" id="step3">
+      <div class="pane-header">
+        <div>
+          <h2><i class="fa-solid fa-pen-nib"></i> Compose Personalized Message</h2>
+          <p class="subtitle">Draft your message using personalized dynamic variables. Every recipient will get their customized email.</p>
+        </div>
+        <div class="composer-toolbar-right">
+          <button class="btn btn-outline btn-sm" id="btnPreviewToggle">
+            <i class="fa-regular fa-eye"></i> Live Preview
+          </button>
+        </div>
+      </div>
+
+      <div class="composer-grid">
+        <!-- Editor Column -->
+        <div class="card glass-card composer-card">
+          <div class="card-body">
+            <!-- Dynamic Tags Inserter Bar -->
+            <div class="tags-container">
+              <span class="tags-label"><i class="fa-solid fa-wand-magic-sparkles"></i> Click tag to insert:</span>
+              <div class="tags-list" id="dynamicTagsList">
+                <span class="tag-chip" data-tag="{{Name}}">&#123;&#123;Name&#125;&#125;</span>
+                <span class="tag-chip" data-tag="{{Email}}">&#123;&#123;Email&#125;&#125;</span>
+                <span class="tag-chip" data-tag="{{Company}}">&#123;&#123;Company&#125;&#125;</span>
+              </div>
+            </div>
+
+            <!-- Subject Line -->
+            <div class="form-group mt-3">
+              <label for="emailSubject">Subject Line</label>
+              <div class="input-icon-wrap">
+                <i class="fa-solid fa-heading"></i>
+                <input type="text" id="emailSubject" value="Special Announcement for {{Name}}" placeholder="e.g. Update for {{Company}}">
+              </div>
+            </div>
+
+            <!-- Email Body Format Toggle -->
+            <div class="body-format-bar">
+              <label>Message Content</label>
+              <div class="format-toggles">
+                <button type="button" class="btn-toggle-fmt active" id="btnFmtHtml"><i class="fa-solid fa-code"></i> HTML / Rich</button>
+                <button type="button" class="btn-toggle-fmt" id="btnFmtText"><i class="fa-solid fa-font"></i> Plain Text</button>
+              </div>
+            </div>
+
+            <!-- Editor Input -->
+            <div class="editor-wrapper">
+              <textarea id="emailBody" rows="12" placeholder="Write your message here... You can use HTML tags like <p>, <strong>, <a href='...'>, or simple text."></textarea>
+            </div>
+
+            <!-- Attachments & Rate Limits Row -->
+            <div class="composer-bottom-controls">
+              <!-- File Attachment -->
+              <div class="form-group flex-1">
+                <label for="emailAttachments"><i class="fa-solid fa-paperclip"></i> Attachments (Optional)</label>
+                <input type="file" id="emailAttachments" multiple class="file-input-styled">
+                <div id="attachmentList" class="attachment-chips"></div>
+              </div>
+
+              <!-- Rate Limiting Delay -->
+              <div class="form-group delay-control">
+                <label for="delaySeconds">
+                  <i class="fa-solid fa-hourglass-half"></i> Delay Between Emails: <span id="delayVal" class="text-accent">2.0s</span>
+                </label>
+                <input type="range" id="delaySlider" min="0.5" max="10" step="0.5" value="2.0">
+                <div class="time-estimate">
+                  <small id="estimatedDuration">Estimated time for 1,000 emails: ~33 mins</small>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-footer">
+            <button class="btn btn-secondary" id="btnBackToStep2">
+              <i class="fa-solid fa-arrow-left"></i> Back
+            </button>
+            <div class="footer-right-buttons">
+              <button class="btn btn-outline" id="btnSendTestEmail">
+                <i class="fa-solid fa-paper-plane"></i> Send Test to Me
+              </button>
+              <button class="btn btn-primary" id="btnGoToStep4">
+                Next: Launch Campaign <i class="fa-solid fa-arrow-right"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Preview Card -->
+        <div class="card glass-card preview-card">
+          <div class="card-header preview-header">
+            <h3><i class="fa-regular fa-envelope-open"></i> Live Recipient Preview</h3>
+            <div class="preview-recipient-switcher">
+              <span>Previewing Row:</span>
+              <select id="previewRecipientSelect"></select>
+            </div>
+          </div>
+          <div class="card-body email-preview-frame">
+            <div class="preview-meta">
+              <div class="meta-row"><strong>To:</strong> <span id="previewToEmail">john.smith@example.com</span></div>
+              <div class="meta-row"><strong>Subject:</strong> <span id="previewSubject">Special Announcement</span></div>
+            </div>
+            <div class="preview-body-content" id="previewBodyRendered">
+              <!-- Rendered preview content here -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 4: LAUNCH & LIVE DISPATCH MONITOR -->
+    <section class="step-pane" id="step4">
+      <div class="pane-header">
+        <div>
+          <h2><i class="fa-solid fa-rocket"></i> Campaign Dispatch Center</h2>
+          <p class="subtitle">Monitor real-time sending progress, success/failure rate, and delivery audit logs.</p>
+        </div>
+        <div class="campaign-actions-top">
+          <button class="btn btn-outline btn-sm" id="btnExportCsv" disabled>
+            <i class="fa-solid fa-download"></i> Export Results CSV
+          </button>
+        </div>
+      </div>
+
+      <!-- Overview Status Banner -->
+      <div class="campaign-hero-card glass-card">
+        <div class="hero-left">
+          <div class="progress-ring-container">
+            <svg class="progress-ring" width="160" height="160">
+              <circle class="progress-ring__circle-bg" stroke="rgba(255,255,255,0.08)" stroke-width="12" fill="transparent" r="66" cx="80" cy="80"/>
+              <circle class="progress-ring__circle" id="progressCircle" stroke="#6366f1" stroke-width="12" stroke-linecap="round" fill="transparent" r="66" cx="80" cy="80"/>
+            </svg>
+            <div class="progress-center-text">
+              <span class="progress-percent" id="progressPercent">0%</span>
+              <span class="progress-status-badge" id="campaignStatusBadge">READY</span>
+            </div>
+          </div>
+
+          <div class="hero-counters">
+            <div class="counter-box">
+              <span class="counter-label">Total Recipients</span>
+              <strong class="counter-val" id="counterTotal">0</strong>
+            </div>
+            <div class="counter-box text-success">
+              <span class="counter-label">Successfully Sent</span>
+              <strong class="counter-val" id="counterSent">0</strong>
+            </div>
+            <div class="counter-box text-danger">
+              <span class="counter-label">Failed / Error</span>
+              <strong class="counter-val" id="counterFailed">0</strong>
+            </div>
+            <div class="counter-box text-warning">
+              <span class="counter-label">Remaining In Queue</span>
+              <strong class="counter-val" id="counterPending">0</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-controls">
+          <div class="campaign-cta-buttons">
+            <button class="btn btn-hero-start" id="btnStartCampaign">
+              <i class="fa-solid fa-play"></i> START BULK SENDING
+            </button>
+            <button class="btn btn-hero-pause" id="btnPauseResumeCampaign" style="display: none;">
+              <i class="fa-solid fa-pause"></i> Pause
+            </button>
+            <button class="btn btn-hero-stop" id="btnStopCampaign" style="display: none;">
+              <i class="fa-solid fa-stop"></i> Cancel Campaign
+            </button>
+          </div>
+          <div class="speed-indicator">
+            <i class="fa-solid fa-stopwatch"></i> Delay: <span id="summaryDelayText">2.0s per email</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Terminal & Recipient Activity Stream -->
+      <div class="grid-2-col campaign-logs-grid">
+        <!-- Live Audit Terminal -->
+        <div class="card glass-card terminal-card">
+          <div class="card-header terminal-header">
+            <h3><i class="fa-solid fa-terminal"></i> Live Dispatch Terminal</h3>
+            <button class="btn-clear-logs" id="btnClearLogs"><i class="fa-solid fa-trash-can"></i> Clear</button>
+          </div>
+          <div class="card-body terminal-body" id="terminalLogs">
+            <div class="log-line info">[System] Ready to start bulk email dispatch.</div>
+          </div>
+        </div>
+
+        <!-- Recipient Execution List -->
+        <div class="card glass-card recipient-status-card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-users-gear"></i> Recipient Activity List</h3>
+          </div>
+          <div class="card-body recipient-status-body" id="recipientStatusList">
+            <div class="empty-state">
+              <i class="fa-solid fa-inbox"></i>
+              <p>Upload Excel in Step 2 to populate recipient list.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Test Email Modal -->
+  <div class="modal-backdrop" id="testEmailModal">
+    <div class="modal-box glass-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-paper-plane"></i> Send Test Email</h3>
+        <button class="btn-close-modal" id="btnCloseTestModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">Send 1 test message to your personal inbox to verify formatting, tags, and deliverability before the 1,000 bulk dispatch.</p>
+        <div class="form-group">
+          <label for="testTargetEmail">Your Email Address</label>
+          <div class="input-icon-wrap">
+            <i class="fa-solid fa-at"></i>
+            <input type="email" id="testTargetEmail" placeholder="your_personal_email@example.com">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btnCancelTestModal">Cancel</button>
+        <button class="btn btn-primary" id="btnConfirmSendTest">
+          <i class="fa-solid fa-paper-plane"></i> Send Test Now
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Help / Documentation Modal -->
+  <div class="modal-backdrop" id="helpModal">
+    <div class="modal-box glass-card large-modal">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-book-open"></i> Bulk Email Automation User Guide</h3>
+        <button class="btn-close-modal" id="btnCloseHelpModal">&times;</button>
+      </div>
+      <div class="modal-body doc-body">
+        <h4>1. Free Email Delivery & Sending Limits:</h4>
+        <ul>
+          <li><strong>Personal Gmail:</strong> Up to 500 emails per day for free using a Google App Password.</li>
+          <li><strong>Google Workspace / GSuite:</strong> Up to 2,000 emails per day.</li>
+          <li><strong>Brevo (Sendinblue):</strong> 300 emails/day free with 99% inbox rate.</li>
+          <li><strong>Custom Company SMTP:</strong> Unlimited (based on your company server limits).</li>
+        </ul>
+
+        <h4>2. How to Personalize Emails:</h4>
+        <p>Your Excel spreadsheet can have any columns like <code>Name</code>, <code>Company</code>, <code>Invoice</code>, <code>City</code>. In your message, simply write <code>&#123;&#123;Name&#125;&#125;</code> or <code>&#123;&#123;Company&#125;&#125;</code> and the app automatically replaces it for each client!</p>
+
+        <h4>3. Avoiding Spam Filters (Best Practices):</h4>
+        <ul>
+          <li>Keep the delay between emails at <strong>2 - 3 seconds</strong>.</li>
+          <li>Use a legitimate "From Name" and clean subject lines.</li>
+          <li>Always test 1 email before sending to all 1,000 clients.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
