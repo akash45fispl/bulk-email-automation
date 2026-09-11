@@ -484,17 +484,14 @@ app.post('/api/campaign/resume', (req, res) => {
 // ENDPOINT: Stop Campaign
 // ----------------------------------------------------
 app.post('/api/campaign/stop', (req, res) => {
-  if (activeCampaign.status === 'running' || activeCampaign.status === 'paused') {
-    activeCampaign.status = 'stopped';
-    appendLog('warning', 'Campaign cancelled by user.');
-    if (activeCampaign.pausePromiseResolver) {
-      activeCampaign.pausePromiseResolver();
-      activeCampaign.pausePromiseResolver = null;
-    }
-    broadcastProgress({ type: 'status', campaign: getCampaignSnapshot() });
-    return res.json({ success: true, message: 'Campaign stopped' });
+  activeCampaign.status = 'stopped';
+  appendLog('warning', 'Campaign reset / stopped by user.');
+  if (activeCampaign.pausePromiseResolver) {
+    activeCampaign.pausePromiseResolver();
+    activeCampaign.pausePromiseResolver = null;
   }
-  res.status(400).json({ error: 'No active campaign to stop' });
+  broadcastProgress({ type: 'status', campaign: getCampaignSnapshot() });
+  return res.json({ success: true, message: 'Campaign stopped' });
 });
 
 // ----------------------------------------------------
