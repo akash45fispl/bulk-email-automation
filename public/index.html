@@ -120,7 +120,7 @@
               <label for="smtpPort">Port & Security</label>
               <div class="input-group-row">
                 <input type="number" id="smtpPort" value="587" placeholder="587 or 465" style="max-width: 120px;">
-                <select id="smtpSecure">
+                <select id="smtpSecure" aria-label="SMTP Security Protocol">
                   <option value="false">TLS / STARTTLS (587)</option>
                   <option value="true">SSL / Secure (465)</option>
                 </select>
@@ -288,7 +288,7 @@
             <h3><i class="fa-solid fa-list-check"></i> Recipient Preview (First 50 Rows)</h3>
             <div class="table-search">
               <i class="fa-solid fa-magnifying-glass"></i>
-              <input type="text" id="tableFilterInput" placeholder="Filter rows...">
+              <input type="text" id="tableFilterInput" aria-label="Filter recipient rows" placeholder="Filter rows...">
             </div>
           </div>
           <div class="table-responsive">
@@ -343,13 +343,13 @@
               <label for="emailSubject">Subject Line</label>
               <div class="input-icon-wrap">
                 <i class="fa-solid fa-heading"></i>
-                <input type="text" id="emailSubject" value="Special Announcement for {{Name}}" placeholder="e.g. Update for {{Company}}">
+                <input type="text" id="emailSubject" value="Important update for {{Name}} at {{Company}}" placeholder="e.g. Update for {{Company}}">
               </div>
             </div>
 
             <!-- Email Body Format Toggle -->
             <div class="body-format-bar">
-              <label>Message Content</label>
+              <label for="emailBody">Message Content</label>
               <div class="format-toggles">
                 <button type="button" class="btn-toggle-fmt active" id="btnFmtHtml"><i class="fa-solid fa-code"></i> HTML / Rich</button>
                 <button type="button" class="btn-toggle-fmt" id="btnFmtText"><i class="fa-solid fa-font"></i> Plain Text</button>
@@ -372,7 +372,7 @@
 
               <!-- Rate Limiting Delay & Anti-Spam Jitter -->
               <div class="form-group delay-control">
-                <label for="delaySeconds">
+                <label for="delaySlider">
                   <i class="fa-solid fa-shield-halved text-success"></i> Safe Pacing Delay: <span id="delayVal" class="text-accent">3.0s</span>
                   <span class="badge-cell valid" style="margin-left:auto; font-size:0.7rem;"><i class="fa-solid fa-bolt"></i> Anti-Spam Jitter ON</span>
                 </label>
@@ -405,7 +405,7 @@
             <h3><i class="fa-regular fa-envelope-open"></i> Live Recipient Preview</h3>
             <div class="preview-recipient-switcher">
               <span>Previewing Row:</span>
-              <select id="previewRecipientSelect"></select>
+              <select id="previewRecipientSelect" aria-label="Select preview recipient row"></select>
             </div>
           </div>
           <div class="card-body email-preview-frame">
