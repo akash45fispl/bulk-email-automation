@@ -153,6 +153,45 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ----------------------------------------------------
+  // Theme Selector & Light/Dark Mode Controller
+  // ----------------------------------------------------
+  const themeSelector = document.getElementById('themeSelector');
+  const btnToggleMode = document.getElementById('btnToggleMode');
+
+  function applyTheme(themeKey) {
+    document.body.setAttribute('data-theme', themeKey);
+    const isLight = themeKey.includes('light');
+    document.body.classList.toggle('light-theme', isLight);
+    document.body.classList.toggle('dark-theme', !isLight);
+    if (themeSelector) themeSelector.value = themeKey;
+    if (btnToggleMode) {
+      btnToggleMode.innerHTML = isLight ? '<i class="fa-solid fa-moon"></i>' : '<i class="fa-solid fa-sun"></i>';
+      btnToggleMode.title = isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode';
+    }
+    localStorage.setItem('automailer_theme', themeKey);
+  }
+
+  if (themeSelector) {
+    themeSelector.addEventListener('change', (e) => {
+      applyTheme(e.target.value);
+    });
+  }
+
+  if (btnToggleMode) {
+    btnToggleMode.addEventListener('click', () => {
+      const currentTheme = document.body.getAttribute('data-theme') || 'cosmic-aurora';
+      const isCurrentlyLight = currentTheme.includes('light') || document.body.classList.contains('light-theme');
+      const newTheme = isCurrentlyLight ? 'cosmic-aurora' : 'clean-light';
+      applyTheme(newTheme);
+      showToast(`Switched to ${isCurrentlyLight ? 'Dark' : 'Light'} background!`, 'info');
+    });
+  }
+
+  // Load saved theme (default to clean-light if requested or cosmic-aurora)
+  const savedTheme = localStorage.getItem('automailer_theme') || 'clean-light';
+  applyTheme(savedTheme);
+
+  // ----------------------------------------------------
   // Initial Setup & Local Storage Load
   // ----------------------------------------------------
   loadSavedSettings();
@@ -829,6 +868,15 @@ document.addEventListener('DOMContentLoaded', () => {
     terminalLogs.prepend(line);
   }
 
+  function setProgressRing(percent) {
+    const circle = document.getElementById('progressCircle');
+    if (!circle) return;
+    const radius = circle.r.baseVal.value || 66;
+    const circumference = 2 * Math.PI * radius;
+    circle.style.strokeDasharray = `${circumference} ${circumference}`;
+    const offset = circumference - (percent / 100) * circumference;
+    circle.style.strokeDashoffset = offset;
+  }
 
   // ----------------------------------------------------
   // UTILITY HELPERS
@@ -867,4 +915,24 @@ document.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => toast.remove(), 300);
     }, 4500);
   }
+
+  // ----------------------------------------------------
+  // THEME COLOR PALETTE SWITCHER
+  // ----------------------------------------------------
+  const themeSelector = document.getElementById('themeSelector');
+  const savedTheme = localStorage.getItem('automailer_theme') || 'cosmic-aurora';
+  if (themeSelector) {
+    themeSelector.value = savedTheme;
+    document.body.setAttribute('data-theme', savedTheme);
+
+    themeSelector.addEventListener('change', (e) => {
+      const selected = e.target.value;
+      document.body.setAttribute('data-theme', selected);
+      localStorage.setItem('automailer_theme', selected);
+      showToast(`Switched palette to ${e.target.options[e.target.selectedIndex].text}`, 'info');
+    });
+  }
+
+  // Initial Progress Ring Setup
+  setProgressRing(0);
 });

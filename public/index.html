@@ -25,6 +25,28 @@
       </div>
     </div>
     <div class="header-right">
+      <div class="theme-palette-picker">
+        <label for="themeSelector" class="theme-label"><i class="fa-solid fa-palette"></i> Theme:</label>
+        <select id="themeSelector" class="theme-select">
+          <optgroup label="✨ Light Colors Background">
+            <option value="clean-light">☀️ Clean Slate Light</option>
+            <option value="pastel-light">🌸 Pastel Rose Light</option>
+            <option value="mint-light">🌿 Fresh Mint Light</option>
+            <option value="sky-light">💎 Ice Sky Light</option>
+            <option value="pearl-light">🌞 Warm Pearl Light</option>
+          </optgroup>
+          <optgroup label="🌙 Dark Colors Background">
+            <option value="cosmic-aurora" selected>🌈 Cosmic Aurora (Dark Mixed)</option>
+            <option value="sunset-cyber">🌅 Sunset Cyber</option>
+            <option value="emerald-matrix">💎 Emerald Matrix</option>
+            <option value="royal-amethyst">🔮 Royal Amethyst</option>
+            <option value="oceanic-glow">🌊 Oceanic Glow</option>
+          </optgroup>
+        </select>
+        <button class="btn-mode-toggle" id="btnToggleMode" title="Toggle Light / Dark Mode">
+          <i class="fa-solid fa-sun"></i>
+        </button>
+      </div>
       <div class="badge-status" id="smtpStatusBadge">
         <span class="status-dot disconnected"></span>
         <span class="status-text">SMTP Not Configured</span>
@@ -418,8 +440,16 @@
         <div class="hero-left">
           <div class="progress-ring-container">
             <svg class="progress-ring" width="160" height="160">
+              <defs>
+                <linearGradient id="progressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#10b981"/>
+                  <stop offset="30%" stop-color="#06b6d4"/>
+                  <stop offset="70%" stop-color="#8b5cf6"/>
+                  <stop offset="100%" stop-color="#f43f5e"/>
+                </linearGradient>
+              </defs>
               <circle class="progress-ring__circle-bg" stroke="rgba(255,255,255,0.08)" stroke-width="12" fill="transparent" r="66" cx="80" cy="80"/>
-              <circle class="progress-ring__circle" id="progressCircle" stroke="#6366f1" stroke-width="12" stroke-linecap="round" fill="transparent" r="66" cx="80" cy="80"/>
+              <circle class="progress-ring__circle" id="progressCircle" stroke="url(#progressGrad)" stroke-width="12" stroke-linecap="round" fill="transparent" r="66" cx="80" cy="80"/>
             </svg>
             <div class="progress-center-text">
               <span class="progress-percent" id="progressPercent">0%</span>
