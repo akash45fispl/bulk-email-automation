@@ -111,16 +111,36 @@ function replaceVariables(template, dataRow) {
 // Helper: Create Nodemailer Transporter
 // ----------------------------------------------------
 function createTransporter(smtpConfig) {
+  const host = String(smtpConfig.host || '').toLowerCase().trim();
+  const user = String(smtpConfig.user || '').trim();
+  const rawPass = String(smtpConfig.pass || '').trim();
+  // Strip all whitespace/spaces commonly present when copying 16-char Google App Passwords
+  const pass = rawPass.replace(/\s+/g, '');
+
+  // If host or user is Gmail, use nodemailer's built-in 'gmail' service adapter for maximum reliability
+  if (host.includes('gmail') || user.endsWith('@gmail.com') || user.endsWith('@googlemail.com')) {
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: user,
+        pass: pass
+      },
+      pool: true,
+      maxConnections: 5,
+      maxMessages: 100
+    });
+  }
+
   const port = parseInt(smtpConfig.port, 10) || 587;
   const isSecure = smtpConfig.secure === true || smtpConfig.secure === 'true' || port === 465;
 
   const transportOptions = {
-    host: smtpConfig.host,
+    host: host,
     port: port,
     secure: isSecure, // true for 465, false for 587 / other
     auth: {
-      user: smtpConfig.user,
-      pass: smtpConfig.pass
+      user: user,
+      pass: pass
     },
     tls: {
       rejectUnauthorized: smtpConfig.rejectUnauthorized !== false
