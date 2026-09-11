@@ -916,22 +916,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 4500);
   }
 
-  // ----------------------------------------------------
-  // THEME COLOR PALETTE SWITCHER
-  // ----------------------------------------------------
-  const themeSelector = document.getElementById('themeSelector');
-  const savedTheme = localStorage.getItem('automailer_theme') || 'cosmic-aurora';
-  if (themeSelector) {
-    themeSelector.value = savedTheme;
-    document.body.setAttribute('data-theme', savedTheme);
 
-    themeSelector.addEventListener('change', (e) => {
-      const selected = e.target.value;
-      document.body.setAttribute('data-theme', selected);
-      localStorage.setItem('automailer_theme', selected);
-      showToast(`Switched palette to ${e.target.options[e.target.selectedIndex].text}`, 'info');
-    });
-  }
 
   // Initial Progress Ring Setup
   setProgressRing(0);
