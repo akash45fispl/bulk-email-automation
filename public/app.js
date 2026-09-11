@@ -133,6 +133,26 @@ document.addEventListener('DOMContentLoaded', () => {
   const toastContainer = document.getElementById('toastContainer');
 
   // ----------------------------------------------------
+  // Progress Ring Constants & Initialization
+  // ----------------------------------------------------
+  const circleRadius = 66;
+  const circumference = 2 * Math.PI * circleRadius;
+
+  function setupProgressRing() {
+    if (progressCircle) {
+      progressCircle.style.strokeDasharray = `${circumference} ${circumference}`;
+      progressCircle.style.strokeDashoffset = `${circumference}`;
+    }
+  }
+
+  function setProgressRing(percent) {
+    if (progressCircle) {
+      const offset = circumference - (percent / 100) * circumference;
+      progressCircle.style.strokeDashoffset = offset;
+    }
+  }
+
+  // ----------------------------------------------------
   // Initial Setup & Local Storage Load
   // ----------------------------------------------------
   loadSavedSettings();
@@ -809,21 +829,6 @@ document.addEventListener('DOMContentLoaded', () => {
     terminalLogs.prepend(line);
   }
 
-  // ----------------------------------------------------
-  // PROGRESS RING HELPERS
-  // ----------------------------------------------------
-  const circleRadius = 66;
-  const circumference = 2 * Math.PI * circleRadius;
-
-  function setupProgressRing() {
-    progressCircle.style.strokeDasharray = `${circumference} ${circumference}`;
-    progressCircle.style.strokeDashoffset = `${circumference}`;
-  }
-
-  function setProgressRing(percent) {
-    const offset = circumference - (percent / 100) * circumference;
-    progressCircle.style.strokeDashoffset = offset;
-  }
 
   // ----------------------------------------------------
   // UTILITY HELPERS
