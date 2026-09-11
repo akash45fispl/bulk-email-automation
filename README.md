@@ -1,5 +1,7 @@
 # 🚀 AutoMailer PRO — Bulk Email Automation Platform
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/akash45fispl/bulk-email-automation)
+
 A high-performance, 100% free and open-source automated bulk email sending system designed to handle **1,000+ client emails** directly from Excel/CSV spreadsheets with personalized merge variables (`{{Name}}`, `{{Company}}`), SMTP rate throttling, real-time dispatch monitoring, and live audit logging.
 
 ---
