@@ -106,34 +106,35 @@
       <section class="step-pane active" id="step1">
         <div class="pane-header">
           <div>
-            <h2><i class="fa-solid fa-server"></i> Email Provider & SMTP Settings</h2>
-            <p class="subtitle">Connect your free email account (Gmail, Outlook, Brevo, or Custom SMTP) to send messages safely.</p>
+            <h2><i class="fa-solid fa-server"></i> Email Provider & Connection Settings</h2>
+            <p class="subtitle">Choose between Cloud APIs (Resend, Brevo) for 100% cloud reliability on Render, or Gmail/SMTP for local use.</p>
           </div>
           <div class="preset-group">
-            <span class="preset-label">Quick Presets:</span>
-            <button class="btn-preset active" data-preset="gmail"><i class="fa-brands fa-google"></i> Gmail</button>
+            <span class="preset-label">Provider:</span>
+            <button class="btn-preset active" data-preset="resend"><i class="fa-solid fa-bolt text-accent"></i> Resend API (Cloud 3k/mo Free)</button>
+            <button class="btn-preset" data-preset="brevo"><i class="fa-solid fa-paper-plane text-info"></i> Brevo API (Cloud 300/day)</button>
+            <button class="btn-preset" data-preset="gmail"><i class="fa-brands fa-google text-warning"></i> Gmail (App Password)</button>
             <button class="btn-preset" data-preset="outlook"><i class="fa-brands fa-microsoft"></i> Outlook</button>
-            <button class="btn-preset" data-preset="brevo"><i class="fa-solid fa-bolt"></i> Brevo (Free 300/day)</button>
-            <button class="btn-preset" data-preset="custom"><i class="fa-solid fa-sliders"></i> Custom</button>
+            <button class="btn-preset" data-preset="custom"><i class="fa-solid fa-sliders"></i> Custom SMTP</button>
           </div>
         </div>
 
         <div class="grid-2-col">
-          <!-- SMTP Form Card -->
+          <!-- Credentials Form Card -->
           <div class="card glass-card">
             <div class="card-header">
-              <h3><i class="fa-solid fa-shield-halved"></i> Credentials & Server</h3>
+              <h3 id="formCardTitle"><i class="fa-solid fa-shield-halved"></i> Cloud API Credentials</h3>
             </div>
             <div class="card-body form-grid">
-              <div class="form-group">
+              <div class="form-group" id="groupSmtpHost" style="display:none;">
                 <label for="smtpHost">SMTP Server Host</label>
                 <div class="input-icon-wrap">
                   <i class="fa-solid fa-globe"></i>
-                  <input type="text" id="smtpHost" value="smtp.gmail.com" placeholder="e.g. smtp.gmail.com">
+                  <input type="text" id="smtpHost" value="resend" placeholder="e.g. smtp.gmail.com">
                 </div>
               </div>
 
-              <div class="form-group">
+              <div class="form-group" id="groupSmtpPort" style="display:none;">
                 <label for="smtpPort">Port & Security</label>
                 <div class="input-group-row">
                   <input type="number" id="smtpPort" value="465" placeholder="465 or 587" style="max-width: 120px;">
@@ -144,22 +145,22 @@
                 </div>
               </div>
 
-              <div class="form-group">
-                <label for="smtpUser">Sender Email / Username</label>
+              <div class="form-group" id="groupSmtpUser">
+                <label for="smtpUser" id="labelSmtpUser">Sender Email / Verified Address</label>
                 <div class="input-icon-wrap">
                   <i class="fa-solid fa-envelope"></i>
-                  <input type="email" id="smtpUser" placeholder="your_email@gmail.com">
+                  <input type="email" id="smtpUser" value="onboarding@resend.dev" placeholder="onboarding@resend.dev or you@domain.com">
                 </div>
               </div>
 
-              <div class="form-group">
-                <label for="smtpPass">
-                  Password / App Password
-                  <span class="tooltip-trigger" title="For Gmail, use a 16-character App Password, not regular password!"><i class="fa-solid fa-info-circle"></i></span>
+              <div class="form-group" id="groupSmtpPass">
+                <label for="smtpPass" id="labelSmtpPass">
+                  API Key / Secret Token
+                  <span class="tooltip-trigger" id="tooltipPass" title="Enter your Resend API Key (re_...)"><i class="fa-solid fa-info-circle"></i></span>
                 </label>
                 <div class="input-icon-wrap password-wrap">
                   <i class="fa-solid fa-key"></i>
-                  <input type="password" id="smtpPass" placeholder="16-character App Password">
+                  <input type="password" id="smtpPass" placeholder="re_xxxxxxxxxxxxxxxxxxxxxxxx">
                   <button type="button" class="btn-toggle-pass" id="btnTogglePass"><i class="fa-regular fa-eye"></i></button>
                 </div>
               </div>
@@ -193,23 +194,31 @@
           <!-- Help & Instructions Card -->
           <div class="card glass-card info-card">
             <div class="card-header">
-              <h3><i class="fa-solid fa-lightbulb"></i> Free SMTP Setup Guide</h3>
+              <h3><i class="fa-solid fa-lightbulb"></i> Free Cloud API & SMTP Setup Guide</h3>
             </div>
             <div class="card-body">
-              <div class="tip-box">
-                <h4><i class="fa-brands fa-google"></i> Gmail App Password (Free 500/day):</h4>
+              <div class="tip-box" id="guideResend">
+                <h4><i class="fa-solid fa-bolt text-accent"></i> Resend API (Free 3,000 emails/mo):</h4>
                 <ol>
-                  <li>Go to your Google Account -> <strong>Security</strong>.</li>
-                  <li>Enable <strong>2-Step Verification</strong> if not already active.</li>
-                  <li>Search for <strong>"App passwords"</strong> in the top search bar.</li>
-                  <li>Create an app named <code>AutoMailer</code> and copy the <strong>16-letter code</strong>.</li>
-                  <li>Paste it in the password box on the left.</li>
+                  <li>Sign up for free at 👉 <strong><a href="https://resend.com" target="_blank" rel="noopener" style="color:var(--color-primary-light);">resend.com</a></strong>.</li>
+                  <li>Go to <strong>API Keys</strong> $\rightarrow$ Click <strong>Create API Key</strong>.</li>
+                  <li>Copy the key (starts with <code>re_...</code>) and paste it into the <strong>API Key</strong> field on the left.</li>
+                  <li>Use <code>onboarding@resend.dev</code> (or verify your own domain) as the Sender Email.</li>
+                </ol>
+              </div>
+
+              <div class="tip-box mt-3" id="guideBrevo">
+                <h4><i class="fa-solid fa-paper-plane text-info"></i> Brevo API (Free 300 emails/day):</h4>
+                <ol>
+                  <li>Create a free account at 👉 <strong><a href="https://brevo.com" target="_blank" rel="noopener" style="color:var(--color-primary-light);">brevo.com</a></strong>.</li>
+                  <li>Go to <strong>SMTP & API</strong> $\rightarrow$ <strong>API Keys</strong> $\rightarrow$ Generate Key.</li>
+                  <li>Copy the key (starts with <code>xkeysib-...</code>) into the API Key field.</li>
                 </ol>
               </div>
 
               <div class="tip-box mt-3">
-                <h4><i class="fa-solid fa-gauge-high"></i> Recommended Sending Rates:</h4>
-                <p>For 1,000+ client lists, set the delay to <strong>2 - 3 seconds</strong> in Step 3. This avoids spam detection and prevents email providers from temporarily freezing your account.</p>
+                <h4><i class="fa-solid fa-gauge-high"></i> Cloud Sending Tip:</h4>
+                <p>HTTP APIs (Resend & Brevo) use standard HTTPS (Port 443), which means they are <strong>100% open, zero timeouts, and work 24/7 on Render Cloud</strong>.</p>
               </div>
             </div>
           </div>

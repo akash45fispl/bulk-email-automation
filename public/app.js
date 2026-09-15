@@ -301,25 +301,76 @@ document.addEventListener('DOMContentLoaded', () => {
   // ----------------------------------------------------
   // SMTP Configuration & Presets
   // ----------------------------------------------------
-  const SMTP_PRESETS = {
-    gmail: { host: 'smtp.gmail.com', port: 465, secure: 'true' },
-    outlook: { host: 'smtp-mail.outlook.com', port: 587, secure: 'false' },
-    brevo: { host: 'smtp-relay.brevo.com', port: 587, secure: 'false' },
-    custom: { host: '', port: 465, secure: 'true' }
-  };
+  // ----------------------------------------------------
+  // Email Provider & Preset Configuration
+  // ----------------------------------------------------
+  const groupSmtpHost = document.getElementById('groupSmtpHost');
+  const groupSmtpPort = document.getElementById('groupSmtpPort');
+  const labelSmtpUser = document.getElementById('labelSmtpUser');
+  const labelSmtpPass = document.getElementById('labelSmtpPass');
+  const formCardTitle = document.getElementById('formCardTitle');
+
+  let currentProvider = 'resend';
+
+  function applyProviderPreset(presetName) {
+    currentProvider = presetName;
+    presetBtns.forEach((b) => b.classList.toggle('active', b.getAttribute('data-preset') === presetName));
+
+    if (presetName === 'resend') {
+      if (formCardTitle) formCardTitle.innerHTML = '<i class="fa-solid fa-bolt text-accent"></i> Resend API Credentials (Cloud 3,000/mo)';
+      if (groupSmtpHost) groupSmtpHost.style.display = 'none';
+      if (groupSmtpPort) groupSmtpPort.style.display = 'none';
+      if (labelSmtpUser) labelSmtpUser.textContent = 'Sender Email (e.g. onboarding@resend.dev)';
+      if (labelSmtpPass) labelSmtpPass.innerHTML = 'Resend API Key <span class="tooltip-trigger" title="Get free from resend.com/api-keys"><i class="fa-solid fa-info-circle"></i></span>';
+      smtpHostInput.value = 'resend';
+      if (!smtpUserInput.value) smtpUserInput.value = 'onboarding@resend.dev';
+      smtpPassInput.placeholder = 're_xxxxxxxxxxxxxxxxxxxxxxxx';
+    } else if (presetName === 'brevo') {
+      if (formCardTitle) formCardTitle.innerHTML = '<i class="fa-solid fa-paper-plane text-info"></i> Brevo API Credentials (Cloud 300/day)';
+      if (groupSmtpHost) groupSmtpHost.style.display = 'none';
+      if (groupSmtpPort) groupSmtpPort.style.display = 'none';
+      if (labelSmtpUser) labelSmtpUser.textContent = 'Sender Email (Your verified Brevo email)';
+      if (labelSmtpPass) labelSmtpPass.innerHTML = 'Brevo API Key <span class="tooltip-trigger" title="Get free from brevo.com API keys"><i class="fa-solid fa-info-circle"></i></span>';
+      smtpHostInput.value = 'brevo';
+      smtpPassInput.placeholder = 'xkeysib-xxxxxxxxxxxxxxxxxxxxxxxx';
+    } else if (presetName === 'gmail') {
+      if (formCardTitle) formCardTitle.innerHTML = '<i class="fa-brands fa-google text-warning"></i> Gmail SMTP (For Local / PC Use)';
+      if (groupSmtpHost) groupSmtpHost.style.display = 'block';
+      if (groupSmtpPort) groupSmtpPort.style.display = 'block';
+      if (labelSmtpUser) labelSmtpUser.textContent = 'Gmail Address / Username';
+      if (labelSmtpPass) labelSmtpPass.innerHTML = '16-Character App Password <span class="tooltip-trigger" title="Generate from myaccount.google.com/apppasswords"><i class="fa-solid fa-info-circle"></i></span>';
+      smtpHostInput.value = 'smtp.gmail.com';
+      smtpPortInput.value = '465';
+      smtpSecureSelect.value = 'true';
+      smtpPassInput.placeholder = '16-character App Password';
+    } else if (presetName === 'outlook') {
+      if (formCardTitle) formCardTitle.innerHTML = '<i class="fa-brands fa-microsoft text-info"></i> Outlook / Office 365';
+      if (groupSmtpHost) groupSmtpHost.style.display = 'block';
+      if (groupSmtpPort) groupSmtpPort.style.display = 'block';
+      if (labelSmtpUser) labelSmtpUser.textContent = 'Outlook Email Address';
+      if (labelSmtpPass) labelSmtpPass.innerHTML = 'Password / App Password';
+      smtpHostInput.value = 'smtp-mail.outlook.com';
+      smtpPortInput.value = '587';
+      smtpSecureSelect.value = 'false';
+      smtpPassInput.placeholder = 'Password';
+    } else {
+      if (formCardTitle) formCardTitle.innerHTML = '<i class="fa-solid fa-sliders"></i> Custom SMTP Server';
+      if (groupSmtpHost) groupSmtpHost.style.display = 'block';
+      if (groupSmtpPort) groupSmtpPort.style.display = 'block';
+      if (labelSmtpUser) labelSmtpUser.textContent = 'Username / Email';
+      if (labelSmtpPass) labelSmtpPass.innerHTML = 'SMTP Password';
+      smtpPassInput.placeholder = 'Password';
+    }
+  }
 
   presetBtns.forEach((btn) => {
     btn.addEventListener('click', () => {
-      presetBtns.forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      const preset = SMTP_PRESETS[btn.getAttribute('data-preset')];
-      if (preset) {
-        smtpHostInput.value = preset.host;
-        smtpPortInput.value = preset.port;
-        smtpSecureSelect.value = preset.secure;
-      }
+      applyProviderPreset(btn.getAttribute('data-preset'));
     });
   });
+
+  // Initialize with Resend for 1-click cloud usage
+  applyProviderPreset('resend');
 
   smtpPortInput.addEventListener('input', () => {
     const p = parseInt(smtpPortInput.value, 10);
@@ -343,21 +394,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function getSmtpConfig() {
     return {
+      provider: currentProvider === 'resend' ? 'resend' : (currentProvider === 'brevo' ? 'brevo' : 'smtp'),
       host: smtpHostInput.value.trim(),
-      port: parseInt(smtpPortInput.value, 10) || 587,
+      port: parseInt(smtpPortInput.value, 10) || 465,
       secure: smtpSecureSelect.value === 'true',
       user: smtpUserInput.value.trim(),
       pass: smtpPassInput.value.trim(),
+      apiKey: smtpPassInput.value.trim(),
       fromName: smtpFromNameInput.value.trim(),
-      fromEmail: smtpFromEmailInput.value.trim()
+      fromEmail: smtpFromEmailInput.value.trim() || smtpUserInput.value.trim()
     };
   }
 
   btnTestConnection.addEventListener('click', async () => {
     const config = getSmtpConfig();
-    if (!config.host || !config.user || !config.pass) {
-      showToast('Please enter SMTP Host, User Email, and Password.', 'error');
-      return;
+    if (config.provider === 'resend' || config.provider === 'brevo') {
+      if (!config.pass) {
+        showToast(`Please enter your ${config.provider === 'resend' ? 'Resend' : 'Brevo'} API Key.`, 'error');
+        return;
+      }
+    } else {
+      if (!config.host || !config.user || !config.pass) {
+        showToast('Please enter SMTP Host, User Email, and Password.', 'error');
+        return;
+      }
     }
 
     btnTestConnection.disabled = true;

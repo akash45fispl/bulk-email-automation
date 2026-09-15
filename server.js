@@ -269,26 +269,146 @@ app.post('/api/parse-excel', upload.single('file'), (req, res) => {
 });
 
 // ----------------------------------------------------
-// ENDPOINT: Test SMTP Connection & Send Test Email
+// Unified Email Dispatcher (SMTP + Resend API + Brevo API)
+// ----------------------------------------------------
+async function sendEmailMessage({
+  provider = 'smtp',
+  smtpConfig = {},
+  apiKey = '',
+  fromName = '',
+  fromEmail = '',
+  to = '',
+  subject = '',
+  html = '',
+  text = '',
+  attachments = [],
+  headers = {}
+}) {
+  const key = apiKey || smtpConfig.pass || '';
+  const senderEmail = fromEmail || smtpConfig.fromEmail || smtpConfig.user || 'onboarding@resend.dev';
+  const senderName = fromName || smtpConfig.fromName || 'AutoMailer';
+  const fromAddress = senderName ? `"${senderName}" <${senderEmail}>` : senderEmail;
+
+  if (provider === 'resend') {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: fromAddress,
+        to: Array.isArray(to) ? to : [to],
+        subject,
+        html,
+        text,
+        attachments: attachments && attachments.length > 0 ? attachments.map((a) => ({
+          filename: a.filename,
+          content: Buffer.isBuffer(a.content) ? a.content.toString('base64') : (typeof a.content === 'string' ? a.content : Buffer.from(a.content).toString('base64'))
+        })) : undefined
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || data.error?.message || `Resend API Error: HTTP ${res.status}`);
+    }
+    return data;
+  }
+
+  if (provider === 'brevo') {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': key,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        sender: {
+          name: senderName,
+          email: senderEmail
+        },
+        to: Array.isArray(to) ? to.map(e => ({ email: e })) : [{ email: to }],
+        subject,
+        htmlContent: html,
+        textContent: text,
+        attachment: attachments && attachments.length > 0 ? attachments.map((a) => ({
+          name: a.filename,
+          content: Buffer.isBuffer(a.content) ? a.content.toString('base64') : (typeof a.content === 'string' ? a.content : Buffer.from(a.content).toString('base64'))
+        })) : undefined
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || data.error?.message || `Brevo API Error: HTTP ${res.status}`);
+    }
+    return data;
+  }
+
+  // Fallback / Standard SMTP via Nodemailer
+  const transporter = createTransporter(smtpConfig);
+  return await transporter.sendMail({
+    from: fromAddress,
+    to,
+    replyTo: senderEmail,
+    subject,
+    html,
+    text,
+    headers,
+    attachments
+  });
+}
+
+// ----------------------------------------------------
+// ENDPOINT: Test Connection & Send Test Email (SMTP / Resend / Brevo)
 // ----------------------------------------------------
 app.post('/api/test-smtp', async (req, res) => {
   try {
     const { smtp, testEmail, sampleData } = req.body;
 
-    if (!smtp || !smtp.host || !smtp.user || !smtp.pass) {
-      return res.status(400).json({ error: 'Missing required SMTP configuration (Host, User, Password).' });
+    if (!smtp) {
+      return res.status(400).json({ error: 'Missing configuration.' });
     }
 
-    const transporter = createTransporter(smtp);
-    await transporter.verify();
+    const provider = smtp.provider || (smtp.host === 'resend' ? 'resend' : (smtp.host === 'brevo' ? 'brevo' : 'smtp'));
+    const apiKey = smtp.pass || smtp.apiKey || '';
+
+    if (provider === 'resend') {
+      if (!apiKey) return res.status(400).json({ error: 'Resend API Key is required (starts with re_...).' });
+      // Validate Resend API key
+      const keyCheck = await fetch('https://api.resend.com/api-keys', {
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      });
+      if (!keyCheck.ok && keyCheck.status === 401) {
+        return res.status(400).json({ error: 'Invalid Resend API Key. Please check your key in resend.com.' });
+      }
+    } else if (provider === 'brevo') {
+      if (!apiKey) return res.status(400).json({ error: 'Brevo API Key is required (starts with xkeysib-...).' });
+      // Validate Brevo API key
+      const accCheck = await fetch('https://api.brevo.com/v3/account', {
+        headers: { 'api-key': apiKey }
+      });
+      if (!accCheck.ok) {
+        const accData = await accCheck.json();
+        return res.status(400).json({ error: `Invalid Brevo API Key: ${accData.message || 'Unauthorized'}` });
+      }
+    } else {
+      if (!smtp.host || !smtp.user || !smtp.pass) {
+        return res.status(400).json({ error: 'Missing required SMTP configuration (Host, User, Password).' });
+      }
+      const transporter = createTransporter(smtp);
+      await transporter.verify();
+    }
 
     let testSent = false;
     if (testEmail && isValidEmail(testEmail)) {
       const demoData = sampleData || { Name: 'Demo Client', Company: 'Acme Corp', Email: testEmail };
-      const fromName = smtp.fromName ? `"${smtp.fromName}" <${smtp.fromEmail || smtp.user}>` : (smtp.fromEmail || smtp.user);
 
-      await transporter.sendMail({
-        from: fromName,
+      await sendEmailMessage({
+        provider,
+        smtpConfig: smtp,
+        apiKey,
+        fromName: smtp.fromName,
+        fromEmail: smtp.fromEmail || smtp.user,
         to: testEmail,
         subject: `[Test] ${replaceVariables(req.body.subject || 'Email Automation Test', demoData)}`,
         html: replaceVariables(req.body.htmlBody || '<p>Hello <strong>{{Name}}</strong>, your email automation setup is working perfectly! 🚀</p>', demoData),
@@ -297,16 +417,17 @@ app.post('/api/test-smtp', async (req, res) => {
       testSent = true;
     }
 
+    const providerLabel = provider === 'resend' ? 'Resend API' : (provider === 'brevo' ? 'Brevo API' : 'SMTP Server');
     res.json({
       success: true,
       message: testSent
-        ? `SMTP Connected successfully! Test email dispatched to ${testEmail}.`
-        : 'SMTP Connection verified successfully!'
+        ? `${providerLabel} Connected successfully! Test email dispatched to ${testEmail}.`
+        : `${providerLabel} Connection verified successfully!`
     });
   } catch (err) {
-    console.error('SMTP test error:', err);
+    console.error('Connection test error:', err);
     res.status(500).json({
-      error: `SMTP Connection Failed: ${err.message}. Please check your Host, Port, and App Password.`
+      error: `Connection Failed: ${err.message}. Please check your credentials.`
     });
   }
 });
@@ -458,18 +579,8 @@ app.post('/api/campaign/start', upload.fields([
 // Background queue processor
 async function runCampaignQueue() {
   const { smtp, subject, htmlBody, textBody, delayMs, attachments, baseUrl } = activeCampaign.config;
-  let transporter;
-
-  try {
-    transporter = createTransporter(smtp);
-  } catch (err) {
-    appendLog('error', `Failed to initialize SMTP transporter: ${err.message}`);
-    activeCampaign.status = 'failed';
-    await db.updateCampaignStatus(activeCampaign.id, 'failed');
-    broadcastProgress({ type: 'status', campaign: getCampaignSnapshot() });
-    return;
-  }
-
+  const provider = smtp.provider || (smtp.host === 'resend' ? 'resend' : (smtp.host === 'brevo' ? 'brevo' : 'smtp'));
+  const apiKey = smtp.pass || smtp.apiKey || '';
   const fromName = smtp.fromName ? `"${smtp.fromName}" <${smtp.fromEmail || smtp.user}>` : (smtp.fromEmail || smtp.user);
 
   for (let i = activeCampaign.currentIndex; i < activeCampaign.recipients.length; i++) {
@@ -526,10 +637,13 @@ async function runCampaignQueue() {
           .trim();
       }
 
-      await transporter.sendMail({
-        from: fromName,
+      await sendEmailMessage({
+        provider,
+        smtpConfig: smtp,
+        apiKey,
+        fromName: smtp.fromName,
+        fromEmail: smtp.fromEmail || smtp.user,
         to: recipientEmail,
-        replyTo: smtp.fromEmail || smtp.user,
         subject: personalizedSubject,
         html: personalizedHtml,
         text: personalizedText,
