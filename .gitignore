@@ -5,3 +5,4 @@ campaigns.db
 .env
 .DS_Store
 *.log
+*.exe
