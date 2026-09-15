@@ -136,10 +136,10 @@
               <div class="form-group">
                 <label for="smtpPort">Port & Security</label>
                 <div class="input-group-row">
-                  <input type="number" id="smtpPort" value="587" placeholder="587 or 465" style="max-width: 120px;">
+                  <input type="number" id="smtpPort" value="465" placeholder="465 or 587" style="max-width: 120px;">
                   <select id="smtpSecure" aria-label="SMTP Security Protocol">
+                    <option value="true" selected>SSL / Secure (465) [Recommended]</option>
                     <option value="false">TLS / STARTTLS (587)</option>
-                    <option value="true">SSL / Secure (465)</option>
                   </select>
                 </div>
               </div>

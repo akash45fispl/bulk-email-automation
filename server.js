@@ -136,22 +136,26 @@ function createTransporter(smtpConfig) {
   const user = String(smtpConfig.user || '').trim();
   const rawPass = String(smtpConfig.pass || '').trim();
   const pass = rawPass.replace(/\s+/g, '');
+  const port = parseInt(smtpConfig.port, 10) || 465;
+  const isSecure = smtpConfig.secure === true || smtpConfig.secure === 'true' || port === 465;
 
   if (host.includes('gmail') || user.endsWith('@gmail.com') || user.endsWith('@googlemail.com')) {
     return nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true, // Direct SSL (Works reliably on Render / Cloud)
       auth: {
         user: user,
         pass: pass
       },
-      pool: true,
-      maxConnections: 5,
-      maxMessages: 100
+      tls: {
+        rejectUnauthorized: false
+      },
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 20000
     });
   }
-
-  const port = parseInt(smtpConfig.port, 10) || 587;
-  const isSecure = smtpConfig.secure === true || smtpConfig.secure === 'true' || port === 465;
 
   const transportOptions = {
     host: host,
@@ -164,9 +168,9 @@ function createTransporter(smtpConfig) {
     tls: {
       rejectUnauthorized: smtpConfig.rejectUnauthorized !== false
     },
-    pool: true,
-    maxConnections: 5,
-    maxMessages: 100
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 20000
   };
 
   return nodemailer.createTransport(transportOptions);

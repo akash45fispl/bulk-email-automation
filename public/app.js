@@ -302,10 +302,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // SMTP Configuration & Presets
   // ----------------------------------------------------
   const SMTP_PRESETS = {
-    gmail: { host: 'smtp.gmail.com', port: 587, secure: 'false' },
+    gmail: { host: 'smtp.gmail.com', port: 465, secure: 'true' },
     outlook: { host: 'smtp-mail.outlook.com', port: 587, secure: 'false' },
     brevo: { host: 'smtp-relay.brevo.com', port: 587, secure: 'false' },
-    custom: { host: '', port: 587, secure: 'false' }
+    custom: { host: '', port: 465, secure: 'true' }
   };
 
   presetBtns.forEach((btn) => {
@@ -319,6 +319,20 @@ document.addEventListener('DOMContentLoaded', () => {
         smtpSecureSelect.value = preset.secure;
       }
     });
+  });
+
+  smtpPortInput.addEventListener('input', () => {
+    const p = parseInt(smtpPortInput.value, 10);
+    if (p === 465) smtpSecureSelect.value = 'true';
+    else if (p === 587 || p === 25) smtpSecureSelect.value = 'false';
+  });
+
+  smtpSecureSelect.addEventListener('change', () => {
+    if (smtpSecureSelect.value === 'true' && smtpPortInput.value === '587') {
+      smtpPortInput.value = 465;
+    } else if (smtpSecureSelect.value === 'false' && smtpPortInput.value === '465') {
+      smtpPortInput.value = 587;
+    }
   });
 
   btnTogglePass.addEventListener('click', () => {
