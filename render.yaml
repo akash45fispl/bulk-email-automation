@@ -1,10 +1,10 @@
 services:
   - type: web
     name: bulk-email-automation
-    runtime: node
+    env: node
     plan: free
     buildCommand: npm install
-    startCommand: node server.js
+    startCommand: npm start
     envVars:
-      - key: NODE_VERSION
-        value: 20
+      - key: NODE_ENV
+        value: production
