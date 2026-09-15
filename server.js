@@ -8,6 +8,7 @@ const nodemailer = require('nodemailer');
 const db = require('./database');
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 
 // Ensure uploads folder exists
