@@ -1,10 +1,12 @@
 // =========================================================
 // AutoMailer PRO - Frontend Application Logic
+// Enhanced with SQLite Campaign Archiving & Open Tracking
 // =========================================================
 
 document.addEventListener('DOMContentLoaded', () => {
   // Application State
   const state = {
+    currentView: 'wizardView', // 'wizardView' | 'analyticsView'
     currentStep: 1,
     smtp: {
       host: 'smtp.gmail.com',
@@ -37,17 +39,34 @@ document.addEventListener('DOMContentLoaded', () => {
     },
     campaign: {
       id: null,
+      name: '',
       status: 'idle',
       total: 0,
       sent: 0,
       failed: 0,
-      pending: 0
+      pending: 0,
+      opened: 0
+    },
+    analytics: {
+      campaigns: [],
+      stats: null,
+      currentDetailCampaign: null,
+      currentDetailFilter: 'all',
+      searchQuery: ''
     }
   };
 
   // ----------------------------------------------------
   // DOM Elements
   // ----------------------------------------------------
+  // Nav Mode Switcher
+  const navBtnWizard = document.getElementById('navBtnWizard');
+  const navBtnAnalytics = document.getElementById('navBtnAnalytics');
+  const wizardView = document.getElementById('wizardView');
+  const analyticsView = document.getElementById('analyticsView');
+  const headerCampaignCount = document.getElementById('headerCampaignCount');
+
+  // Wizard Stepper & Panes
   const stepBtns = document.querySelectorAll('.step-btn');
   const stepPanes = document.querySelectorAll('.step-pane');
   const presetBtns = document.querySelectorAll('.btn-preset');
@@ -65,7 +84,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnTestConnection = document.getElementById('btnTestConnection');
   const btnSaveStep1 = document.getElementById('btnSaveStep1');
 
-  // Excel / CSV Inputs
+  // Excel / CSV & Campaign Name Inputs
+  const campaignNameInput = document.getElementById('campaignNameInput');
+  const publicBaseUrlInput = document.getElementById('publicBaseUrlInput');
   const dropzone = document.getElementById('dropzone');
   const excelFileInput = document.getElementById('excelFileInput');
   const dataPreviewSection = document.getElementById('dataPreviewSection');
@@ -101,169 +122,201 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnBackToStep2 = document.getElementById('btnBackToStep2');
   const btnGoToStep4 = document.getElementById('btnGoToStep4');
 
-  // Campaign Dispatch & Live Monitor
-  const btnStartCampaign = document.getElementById('btnStartCampaign');
-  const btnPauseResumeCampaign = document.getElementById('btnPauseResumeCampaign');
-  const btnStopCampaign = document.getElementById('btnStopCampaign');
-  const btnExportCsv = document.getElementById('btnExportCsv');
+  // Campaign Monitor Elements
   const progressCircle = document.getElementById('progressCircle');
   const progressPercent = document.getElementById('progressPercent');
   const campaignStatusBadge = document.getElementById('campaignStatusBadge');
+  const counterCampaignName = document.getElementById('counterCampaignName');
   const counterTotal = document.getElementById('counterTotal');
   const counterSent = document.getElementById('counterSent');
+  const counterOpened = document.getElementById('counterOpened');
   const counterFailed = document.getElementById('counterFailed');
   const counterPending = document.getElementById('counterPending');
+  const btnStartCampaign = document.getElementById('btnStartCampaign');
+  const btnPauseResumeCampaign = document.getElementById('btnPauseResumeCampaign');
+  const btnStopCampaign = document.getElementById('btnStopCampaign');
   const summaryDelayText = document.getElementById('summaryDelayText');
   const terminalLogs = document.getElementById('terminalLogs');
   const btnClearLogs = document.getElementById('btnClearLogs');
   const recipientStatusList = document.getElementById('recipientStatusList');
+  const btnExportCsv = document.getElementById('btnExportCsv');
+  const btnViewInAnalytics = document.getElementById('btnViewInAnalytics');
 
-  // Modals
+  // Analytics View Elements
+  const btnRefreshAnalytics = document.getElementById('btnRefreshAnalytics');
+  const btnNewCampaignFromHistory = document.getElementById('btnNewCampaignFromHistory');
+  const kpiTotalCampaigns = document.getElementById('kpiTotalCampaigns');
+  const kpiTotalSent = document.getElementById('kpiTotalSent');
+  const kpiTotalOpened = document.getElementById('kpiTotalOpened');
+  const kpiOverallOpenRate = document.getElementById('kpiOverallOpenRate');
+  const kpiTotalUnseen = document.getElementById('kpiTotalUnseen');
+  const campaignSearchInput = document.getElementById('campaignSearchInput');
+  const historyTableBody = document.getElementById('historyTableBody');
+  const historyFilterBtns = document.querySelectorAll('.filter-group .btn-filter-pill');
+
+  // Campaign Detail Modal Elements
+  const campaignDetailModal = document.getElementById('campaignDetailModal');
+  const btnCloseDetailModal = document.getElementById('btnCloseDetailModal');
+  const btnCloseDetailModalFooter = document.getElementById('btnCloseDetailModalFooter');
+  const modalCampaignName = document.getElementById('modalCampaignName');
+  const modalCampaignMeta = document.getElementById('modalCampaignMeta');
+  const modalMetricTotal = document.getElementById('modalMetricTotal');
+  const modalMetricSent = document.getElementById('modalMetricSent');
+  const modalMetricOpened = document.getElementById('modalMetricOpened');
+  const modalMetricUnseen = document.getElementById('modalMetricUnseen');
+  const modalMetricOpenRate = document.getElementById('modalMetricOpenRate');
+  const modalMetricFailed = document.getElementById('modalMetricFailed');
+  const modalTabs = document.querySelectorAll('.modal-tab-btn');
+  const modalTabPanes = document.querySelectorAll('.modal-tab-pane');
+  const modalRecipientSearch = document.getElementById('modalRecipientSearch');
+  const modalRecipFilterBtns = document.querySelectorAll('.status-filter-pills .btn-filter-pill');
+  const modalRecipientsTableBody = document.getElementById('modalRecipientsTableBody');
+  const countFilterAll = document.getElementById('countFilterAll');
+  const countFilterSeen = document.getElementById('countFilterSeen');
+  const countFilterUnseen = document.getElementById('countFilterUnseen');
+  const countFilterFailed = document.getElementById('countFilterFailed');
+  const modalEmailSubject = document.getElementById('modalEmailSubject');
+  const modalEmailSender = document.getElementById('modalEmailSender');
+  const modalEmailAttachments = document.getElementById('modalEmailAttachments');
+  const modalEmailHtmlBody = document.getElementById('modalEmailHtmlBody');
+  const btnDownloadOriginalExcel = document.getElementById('btnDownloadOriginalExcel');
+  const btnDownloadAnalyticsReport = document.getElementById('btnDownloadAnalyticsReport');
+
+  // Modals & Helpers
   const testEmailModal = document.getElementById('testEmailModal');
   const btnCloseTestModal = document.getElementById('btnCloseTestModal');
   const btnCancelTestModal = document.getElementById('btnCancelTestModal');
-  const testTargetEmail = document.getElementById('testTargetEmail');
   const btnConfirmSendTest = document.getElementById('btnConfirmSendTest');
-
+  const testTargetEmail = document.getElementById('testTargetEmail');
   const helpModal = document.getElementById('helpModal');
   const btnHelpModal = document.getElementById('btnHelpModal');
   const btnCloseHelpModal = document.getElementById('btnCloseHelpModal');
-
-  // Toast Container
   const toastContainer = document.getElementById('toastContainer');
-
-  // ----------------------------------------------------
-  // Progress Ring Constants & Initialization
-  // ----------------------------------------------------
-  const circleRadius = 66;
-  const circumference = 2 * Math.PI * circleRadius;
-
-  function setupProgressRing() {
-    if (progressCircle) {
-      progressCircle.style.strokeDasharray = `${circumference} ${circumference}`;
-      progressCircle.style.strokeDashoffset = `${circumference}`;
-    }
-  }
-
-  function setProgressRing(percent) {
-    if (progressCircle) {
-      const offset = circumference - (percent / 100) * circumference;
-      progressCircle.style.strokeDashoffset = offset;
-    }
-  }
-
-  // ----------------------------------------------------
-  // Theme Selector & Light/Dark Mode Controller
-  // ----------------------------------------------------
   const themeSelector = document.getElementById('themeSelector');
   const btnToggleMode = document.getElementById('btnToggleMode');
 
-  function applyTheme(themeKey) {
-    document.body.setAttribute('data-theme', themeKey);
-    const isLight = themeKey.includes('light');
-    document.body.classList.toggle('light-theme', isLight);
-    document.body.classList.toggle('dark-theme', !isLight);
-    if (themeSelector) themeSelector.value = themeKey;
-    if (btnToggleMode) {
-      btnToggleMode.innerHTML = isLight ? '<i class="fa-solid fa-moon"></i>' : '<i class="fa-solid fa-sun"></i>';
-      btnToggleMode.title = isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode';
+  // Circle Progress Radius
+  const CIRCLE_RADIUS = 66;
+  const CIRCLE_CIRCUMFERENCE = 2 * Math.PI * CIRCLE_RADIUS;
+  if (progressCircle) {
+    progressCircle.style.strokeDasharray = `${CIRCLE_CIRCUMFERENCE} ${CIRCLE_CIRCUMFERENCE}`;
+    progressCircle.style.strokeDashoffset = CIRCLE_CIRCUMFERENCE;
+  }
+
+  // Auto-detect base URL for tracking
+  if (publicBaseUrlInput) {
+    const savedBaseUrl = localStorage.getItem('automailer_base_url');
+    publicBaseUrlInput.value = savedBaseUrl || window.location.origin;
+    publicBaseUrlInput.addEventListener('change', () => {
+      localStorage.setItem('automailer_base_url', publicBaseUrlInput.value.trim());
+    });
+  }
+
+  // ----------------------------------------------------
+  // Toast Helper
+  // ----------------------------------------------------
+  function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    let icon = 'fa-info-circle';
+    if (type === 'success') icon = 'fa-circle-check';
+    if (type === 'error') icon = 'fa-circle-exclamation';
+
+    toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
+    toastContainer.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.animation = 'slideIn 0.3s ease reverse forwards';
+      setTimeout(() => toast.remove(), 300);
+    }, 4500);
+  }
+
+  // ----------------------------------------------------
+  // View Switcher (Wizard vs History & Analytics)
+  // ----------------------------------------------------
+  function switchView(viewName) {
+    state.currentView = viewName;
+    if (viewName === 'wizardView') {
+      wizardView.style.display = 'block';
+      analyticsView.style.display = 'none';
+      navBtnWizard.classList.add('active');
+      navBtnAnalytics.classList.remove('active');
+    } else {
+      wizardView.style.display = 'none';
+      analyticsView.style.display = 'block';
+      navBtnWizard.classList.remove('active');
+      navBtnAnalytics.classList.add('active');
+      loadAnalyticsData();
     }
-    localStorage.setItem('automailer_theme', themeKey);
   }
 
-  if (themeSelector) {
-    themeSelector.addEventListener('change', (e) => {
-      applyTheme(e.target.value);
+  navBtnWizard.addEventListener('click', () => switchView('wizardView'));
+  navBtnAnalytics.addEventListener('click', () => switchView('analyticsView'));
+  if (btnViewInAnalytics) {
+    btnViewInAnalytics.addEventListener('click', () => switchView('analyticsView'));
+  }
+  if (btnNewCampaignFromHistory) {
+    btnNewCampaignFromHistory.addEventListener('click', () => {
+      switchView('wizardView');
+      goToStep(2);
     });
   }
 
-  if (btnToggleMode) {
-    btnToggleMode.addEventListener('click', () => {
-      const currentTheme = document.body.getAttribute('data-theme') || 'cosmic-aurora';
-      const isCurrentlyLight = currentTheme.includes('light') || document.body.classList.contains('light-theme');
-      const newTheme = isCurrentlyLight ? 'cosmic-aurora' : 'clean-light';
-      applyTheme(newTheme);
-      showToast(`Switched to ${isCurrentlyLight ? 'Dark' : 'Light'} background!`, 'info');
-    });
-  }
-
-  // Load saved theme (default to clean-light if requested or cosmic-aurora)
-  const savedTheme = localStorage.getItem('automailer_theme') || 'clean-light';
-  applyTheme(savedTheme);
-
   // ----------------------------------------------------
-  // Initial Setup & Local Storage Load
+  // Step Navigation Logic
   // ----------------------------------------------------
-  loadSavedSettings();
-  emailBodyInput.value = state.message.body;
-  setupProgressRing();
-  setupSSE();
-
-  // ----------------------------------------------------
-  // STEPPER NAVIGATION
-  // ----------------------------------------------------
-  function goToStep(stepNum) {
-    if (stepNum < 1 || stepNum > 4) return;
-    state.currentStep = stepNum;
-
+  function goToStep(stepNumber) {
+    state.currentStep = stepNumber;
     stepBtns.forEach((btn) => {
-      const bStep = parseInt(btn.dataset.step, 10);
-      btn.classList.toggle('active', bStep === stepNum);
-      btn.classList.toggle('completed', bStep < stepNum);
+      const step = parseInt(btn.getAttribute('data-step'), 10);
+      btn.classList.toggle('active', step === stepNumber);
+      btn.classList.toggle('completed', step < stepNumber);
     });
 
     stepPanes.forEach((pane) => {
-      pane.classList.remove('active');
+      pane.classList.toggle('active', pane.id === `step${stepNumber}`);
     });
 
-    const targetPane = document.getElementById(`step${stepNum}`);
-    if (targetPane) targetPane.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    if (stepNum === 3) {
-      updateDynamicTagsUI();
-      updateLivePreview();
-      updateDurationEstimate();
-    } else if (stepNum === 4) {
-      updateCampaignSummaryView();
-    }
+    if (stepNumber === 3) updateLivePreview();
+    if (stepNumber === 4) refreshCampaignSummary();
   }
 
   stepBtns.forEach((btn) => {
     btn.addEventListener('click', () => {
-      const step = parseInt(btn.dataset.step, 10);
-      goToStep(step);
+      const targetStep = parseInt(btn.getAttribute('data-step'), 10);
+      if (targetStep === 2 && !state.smtp.user) {
+        showToast('Please enter your SMTP details first.', 'error');
+        return;
+      }
+      if (targetStep >= 3 && state.excel.validEmails === 0) {
+        showToast('Please upload an Excel file with valid emails in Step 2.', 'error');
+        return;
+      }
+      goToStep(targetStep);
     });
   });
 
-  btnSaveStep1.addEventListener('click', () => {
-    saveSmtpFromInputs();
-    goToStep(2);
-  });
-  btnBackToStep1.addEventListener('click', () => goToStep(1));
-  btnGoToStep3.addEventListener('click', () => goToStep(3));
-  btnBackToStep2.addEventListener('click', () => goToStep(2));
-  btnGoToStep4.addEventListener('click', () => goToStep(4));
-
   // ----------------------------------------------------
-  // STEP 1: SMTP PRESETS & LOGIC
+  // SMTP Configuration & Presets
   // ----------------------------------------------------
-  const smtpPresets = {
-    gmail: { host: 'smtp.gmail.com', port: 587, secure: false },
-    outlook: { host: 'smtp.office365.com', port: 587, secure: false },
-    brevo: { host: 'smtp-relay.brevo.com', port: 587, secure: false },
-    custom: { host: '', port: 587, secure: false }
+  const SMTP_PRESETS = {
+    gmail: { host: 'smtp.gmail.com', port: 587, secure: 'false' },
+    outlook: { host: 'smtp-mail.outlook.com', port: 587, secure: 'false' },
+    brevo: { host: 'smtp-relay.brevo.com', port: 587, secure: 'false' },
+    custom: { host: '', port: 587, secure: 'false' }
   };
 
   presetBtns.forEach((btn) => {
     btn.addEventListener('click', () => {
       presetBtns.forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
-      const presetKey = btn.dataset.preset;
-      const config = smtpPresets[presetKey];
-      if (config) {
-        if (config.host) smtpHostInput.value = config.host;
-        smtpPortInput.value = config.port;
-        smtpSecureSelect.value = String(config.secure);
+      const preset = SMTP_PRESETS[btn.getAttribute('data-preset')];
+      if (preset) {
+        smtpHostInput.value = preset.host;
+        smtpPortInput.value = preset.port;
+        smtpSecureSelect.value = preset.secure;
       }
     });
   });
@@ -274,377 +327,394 @@ document.addEventListener('DOMContentLoaded', () => {
     btnTogglePass.innerHTML = isPass ? '<i class="fa-regular fa-eye-slash"></i>' : '<i class="fa-regular fa-eye"></i>';
   });
 
-  function saveSmtpFromInputs() {
-    state.smtp.host = smtpHostInput.value.trim();
-    state.smtp.port = parseInt(smtpPortInput.value, 10) || 587;
-    state.smtp.secure = smtpSecureSelect.value === 'true';
-    state.smtp.user = smtpUserInput.value.trim();
-    state.smtp.pass = smtpPassInput.value.trim();
-    state.smtp.fromName = smtpFromNameInput.value.trim();
-    state.smtp.fromEmail = smtpFromEmailInput.value.trim() || state.smtp.user;
-
-    localStorage.setItem('automailer_smtp', JSON.stringify({
-      host: state.smtp.host,
-      port: state.smtp.port,
-      secure: state.smtp.secure,
-      user: state.smtp.user,
-      fromName: state.smtp.fromName,
-      fromEmail: state.smtp.fromEmail
-    }));
-  }
-
-  function loadSavedSettings() {
-    try {
-      const saved = localStorage.getItem('automailer_smtp');
-      if (saved) {
-        const obj = JSON.parse(saved);
-        if (obj.host) smtpHostInput.value = obj.host;
-        if (obj.port) smtpPortInput.value = obj.port;
-        if (obj.secure !== undefined) smtpSecureSelect.value = String(obj.secure);
-        if (obj.user) smtpUserInput.value = obj.user;
-        if (obj.fromName) smtpFromNameInput.value = obj.fromName;
-        if (obj.fromEmail) smtpFromEmailInput.value = obj.fromEmail;
-      }
-    } catch (e) {
-      console.warn('Could not load saved settings', e);
-    }
+  function getSmtpConfig() {
+    return {
+      host: smtpHostInput.value.trim(),
+      port: parseInt(smtpPortInput.value, 10) || 587,
+      secure: smtpSecureSelect.value === 'true',
+      user: smtpUserInput.value.trim(),
+      pass: smtpPassInput.value.trim(),
+      fromName: smtpFromNameInput.value.trim(),
+      fromEmail: smtpFromEmailInput.value.trim()
+    };
   }
 
   btnTestConnection.addEventListener('click', async () => {
-    saveSmtpFromInputs();
-    if (!state.smtp.host || !state.smtp.user || !state.smtp.pass) {
-      showToast('Please enter SMTP Host, Username and Password.', 'error');
+    const config = getSmtpConfig();
+    if (!config.host || !config.user || !config.pass) {
+      showToast('Please enter SMTP Host, User Email, and Password.', 'error');
       return;
     }
 
     btnTestConnection.disabled = true;
-    btnTestConnection.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying...';
+    btnTestConnection.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Testing...';
 
     try {
       const res = await fetch('/api/test-smtp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ smtp: state.smtp })
+        body: JSON.stringify({ smtp: config })
       });
       const data = await res.json();
+
       if (res.ok && data.success) {
-        state.smtp.verified = true;
-        updateSmtpBadge(true, 'SMTP Connected');
-        showToast(data.message, 'success');
+        state.smtp = { ...config, verified: true };
+        smtpStatusBadge.innerHTML = `<span class="status-dot connected"></span><span class="status-text">${config.user}</span>`;
+        showToast('SMTP connected and verified successfully! 🚀', 'success');
       } else {
-        state.smtp.verified = false;
-        updateSmtpBadge(false, 'Connection Failed');
-        showToast(data.error || 'Connection failed', 'error');
+        throw new Error(data.error || 'Connection failed');
       }
     } catch (err) {
-      state.smtp.verified = false;
-      updateSmtpBadge(false, 'Network Error');
-      showToast('Failed to reach server.', 'error');
+      showToast(err.message, 'error');
+      smtpStatusBadge.innerHTML = `<span class="status-dot disconnected"></span><span class="status-text">Connection Failed</span>`;
     } finally {
       btnTestConnection.disabled = false;
       btnTestConnection.innerHTML = '<i class="fa-solid fa-plug-circle-check"></i> Test Connection';
     }
   });
 
-  function updateSmtpBadge(connected, text) {
-    const dot = smtpStatusBadge.querySelector('.status-dot');
-    const label = smtpStatusBadge.querySelector('.status-text');
-    dot.className = `status-dot ${connected ? 'connected' : 'disconnected'}`;
-    label.textContent = text;
-  }
+  btnSaveStep1.addEventListener('click', () => {
+    state.smtp = getSmtpConfig();
+    if (!state.smtp.user || !state.smtp.pass) {
+      showToast('Please provide your sender email and password.', 'error');
+      return;
+    }
+    goToStep(2);
+  });
 
   // ----------------------------------------------------
-  // STEP 2: EXCEL / CSV UPLOAD & TABLE PREVIEW
+  // Excel Drag & Drop / Parsing
   // ----------------------------------------------------
   dropzone.addEventListener('click', () => excelFileInput.click());
-  btnReupload.addEventListener('click', () => excelFileInput.click());
-
-  ['dragenter', 'dragover'].forEach((eventName) => {
-    dropzone.addEventListener(eventName, (e) => {
-      e.preventDefault();
-      dropzone.classList.add('dragover');
-    });
+  dropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropzone.classList.add('dragover');
   });
-
-  ['dragleave', 'drop'].forEach((eventName) => {
-    dropzone.addEventListener(eventName, (e) => {
-      e.preventDefault();
-      dropzone.classList.remove('dragover');
-    });
-  });
-
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
   dropzone.addEventListener('drop', (e) => {
-    const files = e.dataTransfer.files;
-    if (files.length > 0) handleFileUpload(files[0]);
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    if (e.dataTransfer.files.length > 0) {
+      handleFileSelected(e.dataTransfer.files[0]);
+    }
   });
 
   excelFileInput.addEventListener('change', (e) => {
-    if (e.target.files.length > 0) handleFileUpload(e.target.files[0]);
+    if (e.target.files.length > 0) {
+      handleFileSelected(e.target.files[0]);
+    }
   });
 
-  async function handleFileUpload(file) {
+  btnReupload.addEventListener('click', () => {
+    excelFileInput.value = '';
+    excelFileInput.click();
+  });
+
+  async function handleFileSelected(file) {
     if (!file) return;
+    const allowed = ['.xlsx', '.xls', '.csv'];
+    const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+    if (!allowed.includes(ext)) {
+      showToast('Invalid file format. Please upload .xlsx, .xls, or .csv', 'error');
+      return;
+    }
+
+    state.excel.file = file;
+    state.excel.fileName = file.name;
+
+    // Auto-generate a clean default campaign dump name if empty
+    if (campaignNameInput && (!campaignNameInput.value || campaignNameInput.value.startsWith('Campaign -'))) {
+      const cleanBase = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+      const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      campaignNameInput.value = `${cleanBase} (${dateStr})`;
+    }
+
     const formData = new FormData();
     formData.append('file', file);
 
-    dropzone.innerHTML = '<div class="dropzone-content"><i class="fa-solid fa-spinner fa-spin fa-2x" style="color:var(--primary);margin-bottom:1rem;"></i><h3>Processing spreadsheet...</h3><p>Extracting recipient records and column variables</p></div>';
+    dropzone.innerHTML = `<div class="dropzone-content"><i class="fa-solid fa-circle-notch fa-spin dropzone-icon text-accent"></i><h3>Parsing Excel Spreadsheet...</h3><p>Extracting rows, headers, and validating email records</p></div>`;
 
     try {
-      const res = await fetch('/api/parse-excel', {
-        method: 'POST',
-        body: formData
-      });
+      const res = await fetch('/api/parse-excel', { method: 'POST', body: formData });
       const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to parse file');
+
+      if (res.ok && data.success) {
+        state.excel.totalRows = data.totalRows;
+        state.excel.validEmails = data.validEmails;
+        state.excel.invalidEmails = data.invalidEmails;
+        state.excel.columns = data.columns;
+        state.excel.emailColumn = data.detectedEmailColumn;
+        state.excel.nameColumn = data.detectedNameColumn;
+        state.excel.fullRows = data.fullRows;
+        state.excel.sampleRows = data.sampleRows;
+
+        renderExcelDataPreview();
+        renderDynamicTags();
+        showToast(`Loaded ${data.validEmails.toLocaleString()} valid recipients from ${file.name}!`, 'success');
+      } else {
+        throw new Error(data.error || 'Failed to parse Excel file');
       }
-
-      state.excel.file = file;
-      state.excel.fileName = data.fileName;
-      state.excel.totalRows = data.totalRows;
-      state.excel.validEmails = data.validEmails;
-      state.excel.invalidEmails = data.invalidEmails;
-      state.excel.columns = data.columns;
-      state.excel.emailColumn = data.detectedEmailColumn;
-      state.excel.nameColumn = data.detectedNameColumn;
-      state.excel.fullRows = data.fullRows;
-      state.excel.sampleRows = data.sampleRows;
-
-      // Update UI
-      dropzone.style.display = 'none';
-      btnReupload.style.display = 'inline-flex';
-      dataPreviewSection.style.display = 'block';
-
-      previewFileName.textContent = data.fileName;
-      previewValidCount.textContent = data.validEmails;
-      previewInvalidCount.textContent = data.invalidEmails;
-      previewColCount.textContent = data.columns.length;
-
-      // Populate Column Selectors
-      populateColumnSelectors(data.columns, data.detectedEmailColumn, data.detectedNameColumn);
-
-      // Render Preview Table
-      renderTable(data.columns, data.sampleRows, data.detectedEmailColumn);
-
-      showToast(`Successfully loaded ${data.totalRows} contacts!`, 'success');
     } catch (err) {
       showToast(err.message, 'error');
-      // Reset dropzone
-      dropzone.innerHTML = `
-        <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" hidden>
-        <div class="dropzone-content">
-          <div class="dropzone-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
-          <h3>Drag & Drop your Excel (.xlsx, .xls) or .CSV file here</h3>
-          <p>or click to browse files from your computer</p>
-        </div>
-      `;
+      resetDropzone();
     }
   }
 
-  function populateColumnSelectors(columns, emailCol, nameCol) {
-    selectEmailColumn.innerHTML = '';
-    selectNameColumn.innerHTML = '<option value="">-- None --</option>';
-
-    columns.forEach((col) => {
-      const opt1 = document.createElement('option');
-      opt1.value = col;
-      opt1.textContent = col;
-      if (col === emailCol) opt1.selected = true;
-      selectEmailColumn.appendChild(opt1);
-
-      const opt2 = document.createElement('option');
-      opt2.value = col;
-      opt2.textContent = col;
-      if (col === nameCol) opt2.selected = true;
-      selectNameColumn.appendChild(opt2);
+  function resetDropzone() {
+    dropzone.style.display = 'block';
+    dataPreviewSection.style.display = 'none';
+    btnReupload.style.display = 'none';
+    dropzone.innerHTML = `
+      <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" hidden>
+      <div class="dropzone-content">
+        <div class="dropzone-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+        <h3>Drag & Drop your Excel (.xlsx, .xls) or .CSV file here</h3>
+        <p>or click to browse files from your computer</p>
+        <div class="dropzone-hints">
+          <span><i class="fa-solid fa-check"></i> Supports 10,000+ rows</span>
+          <span><i class="fa-solid fa-check"></i> Auto-detects column headers</span>
+          <span><i class="fa-solid fa-check"></i> Saved permanently in SQLite</span>
+        </div>
+      </div>
+    `;
+    const newFileInput = document.getElementById('excelFileInput');
+    newFileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) handleFileSelected(e.target.files[0]);
     });
   }
 
-  selectEmailColumn.addEventListener('change', (e) => {
-    state.excel.emailColumn = e.target.value;
-    renderTable(state.excel.columns, state.excel.sampleRows, e.target.value);
-  });
+  function renderExcelDataPreview() {
+    dropzone.style.display = 'none';
+    dataPreviewSection.style.display = 'block';
+    btnReupload.style.display = 'inline-flex';
 
-  selectNameColumn.addEventListener('change', (e) => {
-    state.excel.nameColumn = e.target.value;
-  });
+    previewFileName.textContent = state.excel.fileName;
+    previewValidCount.textContent = state.excel.validEmails.toLocaleString();
+    previewInvalidCount.textContent = state.excel.invalidEmails.toLocaleString();
+    previewColCount.textContent = state.excel.columns.length;
 
-  function renderTable(columns, rows, emailCol, filterText = '') {
-    previewTableHead.innerHTML = `
-      <tr>
-        <th style="width: 50px;">#</th>
-        <th>Status</th>
-        ${columns.map((c) => `<th class="${c === emailCol ? 'text-primary' : ''}">${c}</th>`).join('')}
-      </tr>
-    `;
+    // Populate Column Selectors
+    selectEmailColumn.innerHTML = state.excel.columns
+      .map((col) => `<option value="${col}" ${col === state.excel.emailColumn ? 'selected' : ''}>${col}</option>`)
+      .join('');
 
-    const filtered = filterText
-      ? rows.filter((r) => Object.values(r).some((v) => String(v).toLowerCase().includes(filterText.toLowerCase())))
+    selectNameColumn.innerHTML = `<option value="">-- None / Use Email --</option>` + state.excel.columns
+      .map((col) => `<option value="${col}" ${col === state.excel.nameColumn ? 'selected' : ''}>${col}</option>`)
+      .join('');
+
+    selectEmailColumn.addEventListener('change', (e) => {
+      state.excel.emailColumn = e.target.value;
+      recalculateValidEmails();
+    });
+
+    renderPreviewTable(state.excel.sampleRows);
+  }
+
+  function recalculateValidEmails() {
+    const col = state.excel.emailColumn;
+    let valid = 0;
+    let invalid = 0;
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    state.excel.fullRows.forEach((row) => {
+      const email = String(row[col] || '').trim();
+      if (re.test(email)) valid++;
+      else invalid++;
+    });
+
+    state.excel.validEmails = valid;
+    state.excel.invalidEmails = invalid;
+    previewValidCount.textContent = valid.toLocaleString();
+    previewInvalidCount.textContent = invalid.toLocaleString();
+    renderPreviewTable(state.excel.sampleRows);
+  }
+
+  function renderPreviewTable(rows) {
+    const cols = state.excel.columns;
+    previewTableHead.innerHTML = `<tr><th>#</th>` + cols.map((c) => `<th>${c} ${c === state.excel.emailColumn ? '📧' : ''}</th>`).join('') + `<th>Status</th></tr>`;
+
+    const filterText = (tableFilterInput ? tableFilterInput.value : '').toLowerCase().trim();
+    const filteredRows = filterText
+      ? rows.filter((r) => Object.values(r).some((v) => String(v).toLowerCase().includes(filterText)))
       : rows;
 
-    previewTableBody.innerHTML = filtered.map((row, idx) => {
-      const isValid = row.__isValidEmail;
+    previewTableBody.innerHTML = filteredRows.map((r, i) => {
+      const emailVal = String(r[state.excel.emailColumn] || '').trim();
+      const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal);
       return `
         <tr>
-          <td>${row.__rowIndex || idx + 1}</td>
-          <td>
-            <span class="badge-cell ${isValid ? 'valid' : 'invalid'}">
-              <i class="fa-solid fa-${isValid ? 'check' : 'xmark'}"></i> ${isValid ? 'Valid' : 'Invalid'}
-            </span>
-          </td>
-          ${columns.map((c) => `<td>${escapeHtml(String(row[c] || ''))}</td>`).join('')}
+          <td>${i + 1}</td>
+          ${cols.map((c) => `<td>${r[c] !== undefined ? r[c] : ''}</td>`).join('')}
+          <td><span class="badge-cell ${isValid ? 'valid' : 'invalid'}">${isValid ? '✓ Valid' : '✗ Invalid'}</span></td>
         </tr>
       `;
     }).join('');
   }
 
-  tableFilterInput.addEventListener('input', (e) => {
-    renderTable(state.excel.columns, state.excel.sampleRows, state.excel.emailColumn, e.target.value);
+  if (tableFilterInput) {
+    tableFilterInput.addEventListener('input', () => renderPreviewTable(state.excel.sampleRows));
+  }
+
+  btnBackToStep1.addEventListener('click', () => goToStep(1));
+  btnGoToStep3.addEventListener('click', () => {
+    if (state.excel.validEmails === 0) {
+      showToast('No valid recipients found in selected email column.', 'error');
+      return;
+    }
+    goToStep(3);
   });
 
   // ----------------------------------------------------
-  // STEP 3: MESSAGE COMPOSER & LIVE PREVIEW
+  // Dynamic Tags & Message Composer
   // ----------------------------------------------------
-  function updateDynamicTagsUI() {
-    const cols = state.excel.columns.length > 0 ? state.excel.columns : ['Name', 'Email', 'Company'];
-    dynamicTagsList.innerHTML = cols.map((col) => {
+  function renderDynamicTags() {
+    dynamicTagsList.innerHTML = state.excel.columns.map((col) => {
       return `<span class="tag-chip" data-tag="{{${col}}}">&#123;&#123;${col}&#125;&#125;</span>`;
     }).join('');
 
-    // Attach click listeners to tags
     dynamicTagsList.querySelectorAll('.tag-chip').forEach((chip) => {
       chip.addEventListener('click', () => {
-        insertAtCursor(emailBodyInput, chip.dataset.tag);
+        const tag = chip.getAttribute('data-tag');
+        insertTagAtCursor(emailBodyInput, tag);
         updateLivePreview();
       });
     });
 
-    // Populate recipient preview switcher
-    previewRecipientSelect.innerHTML = '';
-    const sampleList = state.excel.fullRows.slice(0, 20);
-    if (sampleList.length === 0) {
-      previewRecipientSelect.innerHTML = '<option value="0">Demo Client</option>';
-    } else {
-      sampleList.forEach((r, idx) => {
-        const nameVal = r[state.excel.nameColumn] || r[state.excel.columns[0]] || `Row #${idx + 1}`;
-        const opt = document.createElement('option');
-        opt.value = idx;
-        opt.textContent = `#${idx + 1} - ${nameVal}`;
-        previewRecipientSelect.appendChild(opt);
-      });
-    }
+    previewRecipientSelect.innerHTML = state.excel.sampleRows.slice(0, 20).map((r, idx) => {
+      const name = r[state.excel.nameColumn] || `Row #${idx + 1}`;
+      const email = r[state.excel.emailColumn] || 'No email';
+      return `<option value="${idx}">Row ${idx + 1}: ${name} (${email})</option>`;
+    }).join('');
   }
 
-  function insertAtCursor(textarea, textToInsert) {
-    const startPos = textarea.selectionStart;
-    const endPos = textarea.selectionEnd;
-    textarea.value = textarea.value.substring(0, startPos) + textToInsert + textarea.value.substring(endPos);
+  function insertTagAtCursor(textarea, tag) {
+    const start = textarea.selectionStart || 0;
+    const end = textarea.selectionEnd || 0;
+    const text = textarea.value;
+    textarea.value = text.substring(0, start) + tag + text.substring(end);
     textarea.focus();
-    textarea.selectionStart = startPos + textToInsert.length;
-    textarea.selectionEnd = startPos + textToInsert.length;
+    textarea.selectionStart = textarea.selectionEnd = start + tag.length;
   }
+
+  emailSubjectInput.addEventListener('input', () => {
+    state.message.subject = emailSubjectInput.value;
+    updateLivePreview();
+  });
+
+  emailBodyInput.addEventListener('input', () => {
+    state.message.body = emailBodyInput.value;
+    updateLivePreview();
+  });
 
   btnFmtHtml.addEventListener('click', () => {
+    state.message.isHtml = true;
     btnFmtHtml.classList.add('active');
     btnFmtText.classList.remove('active');
-    state.message.isHtml = true;
     updateLivePreview();
   });
 
   btnFmtText.addEventListener('click', () => {
+    state.message.isHtml = false;
     btnFmtText.classList.add('active');
     btnFmtHtml.classList.remove('active');
-    state.message.isHtml = false;
     updateLivePreview();
   });
 
-  emailSubjectInput.addEventListener('input', () => updateLivePreview());
-  emailBodyInput.addEventListener('input', () => updateLivePreview());
-  previewRecipientSelect.addEventListener('change', () => updateLivePreview());
-
-  function updateLivePreview() {
-    const selectedIdx = parseInt(previewRecipientSelect.value, 10) || 0;
-    const clientData = state.excel.fullRows[selectedIdx] || {
-      Name: 'John Smith',
-      Email: 'john.smith@example.com',
-      Company: 'Acme Corp'
-    };
-
-    const emailCol = state.excel.emailColumn || 'Email';
-    previewToEmail.textContent = clientData[emailCol] || 'client@example.com';
-
-    const rawSubj = emailSubjectInput.value || 'No Subject';
-    previewSubject.textContent = replaceVariables(rawSubj, clientData);
-
-    const rawBody = emailBodyInput.value || '<p>No content</p>';
-    const rendered = replaceVariables(rawBody, clientData);
-
-    if (state.message.isHtml) {
-      previewBodyRendered.innerHTML = rendered;
-    } else {
-      previewBodyRendered.textContent = rendered;
-    }
-  }
-
-  // Delay & Rate slider
   delaySlider.addEventListener('input', (e) => {
     const val = parseFloat(e.target.value);
     state.message.delaySeconds = val;
     delayVal.textContent = `${val.toFixed(1)}s`;
-    summaryDelayText.textContent = `${val.toFixed(1)}s per email`;
-    updateDurationEstimate();
+    if (summaryDelayText) summaryDelayText.textContent = `${val.toFixed(1)}s per email`;
+    const mins = Math.round((1000 * val) / 60);
+    estimatedDuration.textContent = `Estimated time for 1,000 emails: ~${mins} mins (Natural anti-spam delivery)`;
   });
 
-  function updateDurationEstimate() {
-    const totalCount = state.excel.validEmails || 1000;
-    const totalSec = totalCount * state.message.delaySeconds;
-    const mins = Math.ceil(totalSec / 60);
-    estimatedDuration.textContent = `Estimated time for ${totalCount} emails: ~${mins} min${mins > 1 ? 's' : ''}`;
-  }
-
-  // Attachment handling
+  // Attachments Handling
   emailAttachmentsInput.addEventListener('change', (e) => {
-    state.message.attachments = Array.from(e.target.files);
+    const files = Array.from(e.target.files);
+    state.message.attachments = files;
     renderAttachmentChips();
   });
 
   function renderAttachmentChips() {
-    attachmentList.innerHTML = state.message.attachments.map((f, i) => `
-      <span class="tag-chip" style="background:#1e293b; color:#38bdf8;">
-        <i class="fa-solid fa-paperclip"></i> ${escapeHtml(f.name)} (${(f.size / 1024).toFixed(0)} KB)
-      </span>
+    attachmentList.innerHTML = state.message.attachments.map((file, i) => `
+      <div class="attachment-chip">
+        <i class="fa-solid fa-file"></i>
+        <span>${file.name} (${(file.size / 1024).toFixed(1)} KB)</span>
+        <button type="button" class="btn-remove-att" data-index="${i}">&times;</button>
+      </div>
     `).join('');
+
+    attachmentList.querySelectorAll('.btn-remove-att').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const idx = parseInt(e.target.getAttribute('data-index'), 10);
+        state.message.attachments.splice(idx, 1);
+        renderAttachmentChips();
+      });
+    });
   }
 
-  // ----------------------------------------------------
-  // TEST EMAIL MODAL
-  // ----------------------------------------------------
-  btnSendTestEmail.addEventListener('click', () => {
-    saveSmtpFromInputs();
-    if (!state.smtp.user) {
-      showToast('Please configure your sender email in Step 1 first.', 'error');
-      goToStep(1);
+  function replaceVars(template, row) {
+    if (!template || !row) return '';
+    let res = template;
+    for (const [k, v] of Object.entries(row)) {
+      const regex = new RegExp(`\\{\\{\\s*${k}\\s*\\}\\}|\\{\\s*${k}\\s*\\}`, 'gi');
+      res = res.replace(regex, v !== undefined && v !== null ? String(v) : '');
+    }
+    return res;
+  }
+
+  function updateLivePreview() {
+    const selectedIdx = parseInt(previewRecipientSelect.value, 10) || 0;
+    const clientData = state.excel.sampleRows[selectedIdx] || { Name: 'John Smith', Company: 'Apex Corp', Email: 'john@example.com' };
+
+    previewToEmail.textContent = clientData[state.excel.emailColumn] || 'recipient@example.com';
+    previewSubject.textContent = replaceVars(state.message.subject, clientData);
+
+    const renderedBody = replaceVars(state.message.body, clientData);
+    if (state.message.isHtml) {
+      previewBodyRendered.innerHTML = renderedBody;
+    } else {
+      previewBodyRendered.innerHTML = `<pre style="font-family: inherit; white-space: pre-wrap;">${renderedBody}</pre>`;
+    }
+  }
+
+  previewRecipientSelect.addEventListener('change', updateLivePreview);
+
+  btnBackToStep2.addEventListener('click', () => goToStep(2));
+  btnGoToStep4.addEventListener('click', () => {
+    if (!state.message.subject.trim()) {
+      showToast('Please enter an email subject line.', 'error');
       return;
     }
-    testTargetEmail.value = state.smtp.user;
-    testEmailModal.classList.add('active');
+    if (!state.message.body.trim()) {
+      showToast('Please compose your message content.', 'error');
+      return;
+    }
+    goToStep(4);
   });
 
+  // ----------------------------------------------------
+  // Test Email Modal
+  // ----------------------------------------------------
+  btnSendTestEmail.addEventListener('click', () => {
+    testTargetEmail.value = state.smtp.fromEmail || state.smtp.user || '';
+    testEmailModal.classList.add('active');
+  });
   btnCloseTestModal.addEventListener('click', () => testEmailModal.classList.remove('active'));
   btnCancelTestModal.addEventListener('click', () => testEmailModal.classList.remove('active'));
 
   btnConfirmSendTest.addEventListener('click', async () => {
-    const target = testTargetEmail.value.trim();
-    if (!target) {
-      showToast('Please enter a destination email address.', 'error');
+    const email = testTargetEmail.value.trim();
+    if (!email) {
+      showToast('Please enter your personal email address.', 'error');
       return;
     }
 
     btnConfirmSendTest.disabled = true;
-    btnConfirmSendTest.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
+    btnConfirmSendTest.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Sending Test...';
 
-    const selectedIdx = parseInt(previewRecipientSelect.value, 10) || 0;
-    const sampleData = state.excel.fullRows[selectedIdx] || { Name: 'Demo Client', Company: 'Acme Corp' };
+    const sampleData = state.excel.sampleRows[0] || { Name: 'Demo Client', Company: 'Your Company', Email: email };
 
     try {
       const res = await fetch('/api/test-smtp', {
@@ -652,102 +722,118 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           smtp: state.smtp,
-          testEmail: target,
-          subject: emailSubjectInput.value,
-          htmlBody: state.message.isHtml ? emailBodyInput.value : undefined,
-          textBody: !state.message.isHtml ? emailBodyInput.value : undefined,
+          testEmail: email,
+          subject: state.message.subject,
+          htmlBody: state.message.isHtml ? state.message.body : undefined,
+          textBody: !state.message.isHtml ? state.message.body : undefined,
           sampleData
         })
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        showToast(`Test email successfully sent to ${target}! Check your inbox.`, 'success');
+        showToast(`Test email dispatched to ${email}! Check your inbox.`, 'success');
         testEmailModal.classList.remove('active');
       } else {
-        showToast(data.error || 'Failed to send test email.', 'error');
+        throw new Error(data.error || 'Failed to send test email');
       }
     } catch (err) {
-      showToast('Error communicating with server.', 'error');
+      showToast(err.message, 'error');
     } finally {
       btnConfirmSendTest.disabled = false;
       btnConfirmSendTest.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send Test Now';
     }
   });
 
-  // Help Modal
-  btnHelpModal.addEventListener('click', () => helpModal.classList.add('active'));
-  btnCloseHelpModal.addEventListener('click', () => helpModal.classList.remove('active'));
-
   // ----------------------------------------------------
-  // STEP 4: CAMPAIGN DISPATCH & LIVE REAL-TIME MONITOR
+  // STEP 4: Campaign Dispatch & Execution
   // ----------------------------------------------------
-  function updateCampaignSummaryView() {
-    const total = state.excel.validEmails || 0;
-    counterTotal.textContent = total;
+  function refreshCampaignSummary() {
+    const defaultName = campaignNameInput ? campaignNameInput.value.trim() : `Dump_${new Date().toLocaleDateString()}`;
+    if (counterCampaignName) counterCampaignName.textContent = defaultName || 'New Campaign';
+    counterTotal.textContent = state.excel.validEmails.toLocaleString();
     counterSent.textContent = '0';
+    counterOpened.textContent = '0';
     counterFailed.textContent = '0';
-    counterPending.textContent = total;
+    counterPending.textContent = state.excel.validEmails.toLocaleString();
+    updateProgressRing(0);
+    renderRecipientActivityInitial();
+  }
 
-    // Render initial recipient list
-    if (state.excel.fullRows.length > 0) {
-      const emailCol = state.excel.emailColumn;
-      recipientStatusList.innerHTML = state.excel.fullRows.map((r, i) => `
-        <div class="recipient-item-row" id="recRow_${i}">
-          <div class="recipient-item-email">#${i + 1}. ${escapeHtml(String(r[emailCol] || ''))}</div>
-          <div class="recipient-item-status pending">Pending</div>
+  function renderRecipientActivityInitial() {
+    const list = state.excel.fullRows.slice(0, 100);
+    recipientStatusList.innerHTML = list.map((r, i) => {
+      const email = r[state.excel.emailColumn];
+      const name = r[state.excel.nameColumn] || `Recipient #${i + 1}`;
+      return `
+        <div class="recipient-item" id="recip-item-${i + 1}">
+          <div class="recipient-item-info">
+            <strong>${name}</strong>
+            <small>${email}</small>
+          </div>
+          <span class="recipient-item-status pending" id="recip-status-${i + 1}">Queued</span>
         </div>
-      `).join('');
-    }
+      `;
+    }).join('');
+  }
+
+  function updateProgressRing(percent) {
+    if (!progressCircle) return;
+    const offset = CIRCLE_CIRCUMFERENCE - (percent / 100) * CIRCLE_CIRCUMFERENCE;
+    progressCircle.style.strokeDashoffset = offset;
+    progressPercent.textContent = `${Math.round(percent)}%`;
   }
 
   btnStartCampaign.addEventListener('click', async () => {
-    saveSmtpFromInputs();
-    if (!state.smtp.host || !state.smtp.user || !state.smtp.pass) {
-      showToast('Please complete SMTP configuration in Step 1.', 'error');
-      goToStep(1);
-      return;
-    }
-    if (!state.excel.fullRows || state.excel.fullRows.length === 0) {
-      showToast('Please upload an Excel contact sheet in Step 2.', 'error');
-      goToStep(2);
+    if (state.excel.validEmails === 0) {
+      showToast('No recipients queued to send.', 'error');
       return;
     }
 
-    const formData = new FormData();
-    formData.append('smtp', JSON.stringify(state.smtp));
-    formData.append('emailColumn', state.excel.emailColumn);
-    formData.append('subject', emailSubjectInput.value);
-    if (state.message.isHtml) {
-      formData.append('htmlBody', emailBodyInput.value);
-    } else {
-      formData.append('textBody', emailBodyInput.value);
-    }
-    formData.append('recipients', JSON.stringify(state.excel.fullRows));
-    formData.append('delaySeconds', state.message.delaySeconds);
-
-    // Attachments
-    state.message.attachments.forEach((file) => {
-      formData.append('attachments', file);
-    });
+    const campaignDumpName = (campaignNameInput ? campaignNameInput.value : '').trim() || `Campaign - ${new Date().toLocaleString()}`;
+    const baseUrl = (publicBaseUrlInput ? publicBaseUrlInput.value : '').trim() || window.location.origin;
 
     btnStartCampaign.disabled = true;
-    btnStartCampaign.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Initializing...';
+    btnStartCampaign.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Initializing...';
+
+    const formData = new FormData();
+    formData.append('campaignName', campaignDumpName);
+    formData.append('publicBaseUrl', baseUrl);
+    formData.append('originalFilename', state.excel.fileName || 'recipients.xlsx');
+    formData.append('smtp', JSON.stringify(state.smtp));
+    formData.append('emailColumn', state.excel.emailColumn);
+    formData.append('subject', state.message.subject);
+    formData.append('htmlBody', state.message.isHtml ? state.message.body : '');
+    formData.append('textBody', !state.message.isHtml ? state.message.body : '');
+    formData.append('delaySeconds', state.message.delaySeconds);
+    formData.append('recipients', JSON.stringify(state.excel.fullRows));
+
+    // Append attachments and original Excel file
+    state.message.attachments.forEach((file) => formData.append('attachments', file));
+    if (state.excel.file) {
+      formData.append('excelFile', state.excel.file);
+    }
 
     try {
-      const res = await fetch('/api/campaign/start', {
-        method: 'POST',
-        body: formData
-      });
+      const res = await fetch('/api/campaign/start', { method: 'POST', body: formData });
       const data = await res.json();
-      if (!res.ok || !data.success) {
+
+      if (res.ok && data.success) {
+        state.campaign.id = data.campaignId;
+        state.campaign.name = campaignDumpName;
+        state.campaign.status = 'running';
+        
+        btnStartCampaign.style.display = 'none';
+        btnPauseResumeCampaign.style.display = 'inline-flex';
+        btnStopCampaign.style.display = 'inline-flex';
+        campaignStatusBadge.textContent = 'RUNNING';
+        campaignStatusBadge.className = 'progress-status-badge running';
+        if (btnExportCsv) btnExportCsv.disabled = true;
+
+        showToast(`Campaign "${campaignDumpName}" launched! Dispatching emails...`, 'success');
+        loadAnalyticsData(); // Update counts in header
+      } else {
         throw new Error(data.error || 'Failed to start campaign');
       }
-
-      showToast('Campaign successfully initiated!', 'success');
-      btnStartCampaign.style.display = 'none';
-      btnPauseResumeCampaign.style.display = 'inline-flex';
-      btnStopCampaign.style.display = 'inline-flex';
-      btnExportCsv.disabled = false;
     } catch (err) {
       showToast(err.message, 'error');
       btnStartCampaign.disabled = false;
@@ -757,167 +843,858 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnPauseResumeCampaign.addEventListener('click', async () => {
     if (state.campaign.status === 'running') {
-      await fetch('/api/campaign/pause', { method: 'POST' });
+      const res = await fetch('/api/campaign/pause', { method: 'POST' });
+      if (res.ok) {
+        state.campaign.status = 'paused';
+        btnPauseResumeCampaign.innerHTML = '<i class="fa-solid fa-play"></i> Resume';
+        campaignStatusBadge.textContent = 'PAUSED';
+        campaignStatusBadge.className = 'progress-status-badge paused';
+      }
     } else if (state.campaign.status === 'paused') {
-      await fetch('/api/campaign/resume', { method: 'POST' });
+      const res = await fetch('/api/campaign/resume', { method: 'POST' });
+      if (res.ok) {
+        state.campaign.status = 'running';
+        btnPauseResumeCampaign.innerHTML = '<i class="fa-solid fa-pause"></i> Pause';
+        campaignStatusBadge.textContent = 'RUNNING';
+        campaignStatusBadge.className = 'progress-status-badge running';
+      }
     }
   });
 
   btnStopCampaign.addEventListener('click', async () => {
-    if (confirm('Are you sure you want to cancel the bulk campaign?')) {
+    if (confirm('Are you sure you want to stop and reset the campaign?')) {
       await fetch('/api/campaign/stop', { method: 'POST' });
+      state.campaign.status = 'stopped';
+      campaignStatusBadge.textContent = 'STOPPED';
+      campaignStatusBadge.className = 'progress-status-badge failed';
+      btnStartCampaign.style.display = 'inline-flex';
+      btnStartCampaign.disabled = false;
+      btnStartCampaign.innerHTML = '<i class="fa-solid fa-play"></i> RE-START CAMPAIGN';
+      btnPauseResumeCampaign.style.display = 'none';
+      btnStopCampaign.style.display = 'none';
+      if (btnExportCsv) btnExportCsv.disabled = false;
+      if (btnViewInAnalytics) btnViewInAnalytics.style.display = 'inline-flex';
+      loadAnalyticsData();
     }
   });
 
-  btnExportCsv.addEventListener('click', () => {
-    window.location.href = '/api/campaign/export-csv';
-  });
+  if (btnClearLogs) {
+    btnClearLogs.addEventListener('click', () => {
+      terminalLogs.innerHTML = '<div class="log-line info">[System] Audit logs cleared.</div>';
+    });
+  }
 
-  btnClearLogs.addEventListener('click', () => {
-    terminalLogs.innerHTML = '<div class="log-line info">[System] Logs cleared.</div>';
-  });
+  if (btnExportCsv) {
+    btnExportCsv.addEventListener('click', () => {
+      window.location.href = '/api/campaign/export-csv';
+    });
+  }
 
   // ----------------------------------------------------
-  // SSE REAL-TIME CONNECTION
+  // SSE Real-Time Progress & Open Events Listener
   // ----------------------------------------------------
-  function setupSSE() {
+  function initSSE() {
     const eventSource = new EventSource('/api/campaign/events');
 
-    eventSource.onmessage = (event) => {
+    eventSource.onmessage = (e) => {
       try {
-        const payload = JSON.parse(event.data);
-        handleSSEUpdate(payload);
+        const data = JSON.parse(e.data);
+
+        // Real-Time Open Tracking Event
+        if (data.type === 'open_event') {
+          if (counterOpened) {
+            const current = parseInt(counterOpened.textContent, 10) || 0;
+            counterOpened.textContent = (current + 1).toLocaleString();
+          }
+          appendTerminalLog('info', `👁️ Email opened by ${data.email || 'recipient'} at ${data.openedAt}!`);
+          showToast(`👁️ Email opened by ${data.email || 'recipient'}!`, 'info');
+          // If modal or analytics view is open, refresh
+          if (state.currentView === 'analyticsView') loadAnalyticsData();
+          return;
+        }
+
+        if (data.type === 'log') {
+          appendTerminalLog(data.log.type, `[${data.log.timestamp}] ${data.log.message}`);
+        }
+
+        if (data.campaign) {
+          updateCampaignCounters(data.campaign);
+        }
+
+        if (data.currentRecipient) {
+          updateRecipientItem(data.currentRecipient);
+        }
+
+        if (data.type === 'completed') {
+          campaignStatusBadge.textContent = 'COMPLETED';
+          campaignStatusBadge.className = 'progress-status-badge completed';
+          btnStartCampaign.style.display = 'inline-flex';
+          btnStartCampaign.disabled = false;
+          btnStartCampaign.innerHTML = '<i class="fa-solid fa-rotate"></i> Start New Campaign';
+          btnPauseResumeCampaign.style.display = 'none';
+          btnStopCampaign.style.display = 'none';
+          if (btnExportCsv) btnExportCsv.disabled = false;
+          if (btnViewInAnalytics) btnViewInAnalytics.style.display = 'inline-flex';
+          showToast('Campaign successfully completed! 🎉', 'success');
+          loadAnalyticsData();
+        }
       } catch (err) {
-        console.error('Error handling SSE message:', err);
+        console.error('SSE parse error:', err);
       }
     };
 
     eventSource.onerror = () => {
-      console.warn('SSE connection lost. Reconnecting...');
+      console.warn('SSE connection lost. Reconnecting in 3s...');
+      setTimeout(initSSE, 3000);
     };
   }
 
-  function handleSSEUpdate(payload) {
-    if (payload.campaign) {
-      state.campaign = { ...state.campaign, ...payload.campaign };
-      updateCampaignUI(payload.campaign);
-    }
-
-    if (payload.type === 'log' && payload.log) {
-      appendTerminalLog(payload.log);
-    }
-
-    if (payload.type === 'progress' && payload.currentRecipient) {
-      updateRecipientRow(payload.currentRecipient);
-    }
-
-    if (payload.type === 'completed') {
-      btnPauseResumeCampaign.style.display = 'none';
-      btnStopCampaign.style.display = 'none';
-      btnStartCampaign.style.display = 'inline-flex';
-      btnStartCampaign.disabled = false;
-      btnStartCampaign.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Start New Campaign';
-      showToast('🎉 Campaign finished sending!', 'success');
-    }
-  }
-
-  function updateCampaignUI(camp) {
-    counterTotal.textContent = camp.total || 0;
-    counterSent.textContent = camp.sent || 0;
-    counterFailed.textContent = camp.failed || 0;
-    counterPending.textContent = camp.pending || 0;
-
-    const total = camp.total || 1;
-    const completed = (camp.sent || 0) + (camp.failed || 0);
-    const pct = Math.min(100, Math.round((completed / total) * 100));
-
-    progressPercent.textContent = `${pct}%`;
-    setProgressRing(pct);
-
-    campaignStatusBadge.textContent = camp.status.toUpperCase();
-    campaignStatusBadge.className = `progress-status-badge ${camp.status}`;
-
-    if (camp.status === 'running') {
-      btnPauseResumeCampaign.innerHTML = '<i class="fa-solid fa-pause"></i> Pause';
-      btnPauseResumeCampaign.classList.remove('btn-hero-start');
-      btnPauseResumeCampaign.classList.add('btn-hero-pause');
-    } else if (camp.status === 'paused') {
-      btnPauseResumeCampaign.innerHTML = '<i class="fa-solid fa-play"></i> Resume';
-      btnPauseResumeCampaign.classList.remove('btn-hero-pause');
-      btnPauseResumeCampaign.classList.add('btn-hero-start');
-    }
-  }
-
-  function updateRecipientRow(recipient) {
-    const rowIdx = recipient.index - 1;
-    const rowEl = document.getElementById(`recRow_${rowIdx}`);
-    if (rowEl) {
-      const badge = rowEl.querySelector('.recipient-item-status');
-      if (badge) {
-        badge.className = `recipient-item-status ${recipient.status}`;
-        badge.textContent = recipient.status;
-      }
-      rowEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-  }
-
-  function appendTerminalLog(log) {
+  function appendTerminalLog(type, message) {
     const line = document.createElement('div');
-    line.className = `log-line ${log.type}`;
-    line.textContent = `[${log.timestamp}] ${log.message}`;
-    terminalLogs.prepend(line);
+    line.className = `log-line ${type}`;
+    line.textContent = message;
+    terminalLogs.appendChild(line);
+    terminalLogs.scrollTop = terminalLogs.scrollHeight;
   }
 
-  function setProgressRing(percent) {
-    const circle = document.getElementById('progressCircle');
-    if (!circle) return;
-    const radius = circle.r.baseVal.value || 66;
-    const circumference = 2 * Math.PI * radius;
-    circle.style.strokeDasharray = `${circumference} ${circumference}`;
-    const offset = circumference - (percent / 100) * circumference;
-    circle.style.strokeDashoffset = offset;
-  }
+  function updateCampaignCounters(c) {
+    if (counterTotal) counterTotal.textContent = (c.total || 0).toLocaleString();
+    if (counterSent) counterSent.textContent = (c.sent || 0).toLocaleString();
+    if (counterFailed) counterFailed.textContent = (c.failed || 0).toLocaleString();
+    if (counterPending) counterPending.textContent = (c.pending || 0).toLocaleString();
+    if (counterOpened && c.opened !== undefined) counterOpened.textContent = (c.opened || 0).toLocaleString();
 
-  // ----------------------------------------------------
-  // UTILITY HELPERS
-  // ----------------------------------------------------
-  function replaceVariables(template, dataRow) {
-    if (!template) return '';
-    let result = template;
-    for (const [key, val] of Object.entries(dataRow)) {
-      const safeVal = val !== undefined && val !== null ? String(val) : '';
-      const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}|\\{\\s*${key}\\s*\\}`, 'gi');
-      result = result.replace(regex, safeVal);
+    if (c.total > 0) {
+      const processed = (c.sent || 0) + (c.failed || 0);
+      const pct = (processed / c.total) * 100;
+      updateProgressRing(pct);
     }
-    return result;
   }
 
-  function escapeHtml(str) {
-    return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
+  function updateRecipientItem(recipient) {
+    const item = document.getElementById(`recip-item-${recipient.index}`);
+    const badge = document.getElementById(`recip-status-${recipient.index}`);
+    if (item && badge) {
+      badge.className = `recipient-item-status ${recipient.status}`;
+      badge.textContent = recipient.status.toUpperCase();
+      if (recipient.status === 'sent') {
+        item.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+      } else if (recipient.status === 'failed') {
+        item.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+        item.title = recipient.error || 'Failed';
+      }
+    }
   }
 
-  function showToast(message, type = 'info') {
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    const icon = type === 'success' ? 'circle-check' : type === 'error' ? 'circle-exclamation' : 'circle-info';
-    toast.innerHTML = `<i class="fa-solid fa-${icon}"></i> <span>${escapeHtml(message)}</span>`;
-    toastContainer.appendChild(toast);
+  // ----------------------------------------------------
+  // HISTORY & ANALYTICS DASHBOARD LOGIC
+  // ----------------------------------------------------
+  async function loadAnalyticsData() {
+    try {
+      const res = await fetch('/api/campaigns');
+      const data = await res.json();
 
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      toast.style.transform = 'translateX(100%)';
-      toast.style.transition = 'all 0.3s ease';
-      setTimeout(() => toast.remove(), 300);
-    }, 4500);
+      if (res.ok && data.success) {
+        state.analytics.campaigns = data.campaigns || [];
+        state.analytics.stats = data.stats || {};
+
+        // Update Header Badge
+        if (headerCampaignCount) {
+          headerCampaignCount.textContent = state.analytics.campaigns.length;
+        }
+
+        renderKpis(data.stats);
+        renderHistoricalCampaignsTable();
+      }
+    } catch (err) {
+      console.error('Error fetching analytics:', err);
+    }
   }
 
+  function renderKpis(stats) {
+    if (!stats) return;
+    if (kpiTotalCampaigns) kpiTotalCampaigns.textContent = (stats.total_campaigns || 0).toLocaleString();
+    if (kpiTotalSent) kpiTotalSent.textContent = (stats.total_sent || 0).toLocaleString();
+    if (kpiTotalOpened) kpiTotalOpened.textContent = (stats.total_opened || 0).toLocaleString();
+    if (kpiOverallOpenRate) kpiOverallOpenRate.textContent = `${stats.overall_open_rate || 0}% Overall Open Rate`;
+    if (kpiTotalUnseen) kpiTotalUnseen.textContent = (stats.total_unseen || 0).toLocaleString();
+  }
 
+  function renderHistoricalCampaignsTable() {
+    if (!historyTableBody) return;
 
-  // Initial Progress Ring Setup
-  setProgressRing(0);
+    let campaigns = state.analytics.campaigns;
+    const filter = document.querySelector('.filter-group .btn-filter-pill.active')?.getAttribute('data-filter') || 'all';
+    const search = (campaignSearchInput ? campaignSearchInput.value : '').toLowerCase().trim();
+
+    if (filter !== 'all') {
+      campaigns = campaigns.filter((c) => (c.status || '').toLowerCase() === filter);
+    }
+    if (search) {
+      campaigns = campaigns.filter((c) =>
+        (c.name || '').toLowerCase().includes(search) ||
+        (c.subject || '').toLowerCase().includes(search) ||
+        (c.created_at || '').toLowerCase().includes(search)
+      );
+    }
+
+    if (campaigns.length === 0) {
+      historyTableBody.innerHTML = `
+        <tr>
+          <td colspan="9" class="text-center py-5">
+            <div class="empty-state">
+              <i class="fa-solid fa-folder-open"></i>
+              <p>No campaign records found. Create and dispatch your first email campaign above!</p>
+            </div>
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    historyTableBody.innerHTML = campaigns.map((c) => {
+      const dateFormatted = new Date(c.created_at).toLocaleDateString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
+      });
+      const openRate = c.open_rate_pct || 0;
+      const unseen = c.unseen_count !== undefined ? c.unseen_count : (c.total_recipients - c.opened_count);
+
+      let statusBadgeClass = 'valid';
+      if (c.status === 'running') statusBadgeClass = 'text-info';
+      if (c.status === 'paused') statusBadgeClass = 'text-warning';
+      if (c.status === 'failed') statusBadgeClass = 'invalid';
+
+      return `
+        <tr>
+          <td>
+            <strong>${c.name}</strong>
+            <br><small class="text-muted">${c.original_filename || 'Excel Dump'}</small>
+          </td>
+          <td><small>${dateFormatted}</small></td>
+          <td><strong>${c.total_recipients.toLocaleString()}</strong></td>
+          <td><span class="text-success font-bold">${c.sent_count.toLocaleString()}</span></td>
+          <td><span class="badge-seen"><i class="fa-solid fa-eye"></i> ${c.opened_count.toLocaleString()}</span></td>
+          <td><span class="badge-unseen"><i class="fa-solid fa-eye-slash"></i> ${unseen.toLocaleString()}</span></td>
+          <td>
+            <div class="open-rate-pill">
+              <div class="open-rate-bar-bg">
+                <div class="open-rate-bar-fill" style="width: ${Math.min(100, openRate)}%;"></div>
+              </div>
+              <span class="open-rate-pct-text">${openRate}%</span>
+            </div>
+          </td>
+          <td><span class="badge-cell ${statusBadgeClass}">${(c.status || 'COMPLETED').toUpperCase()}</span></td>
+          <td>
+            <div class="table-actions-cell">
+              <button class="btn-action-icon btn-view-detail" data-id="${c.id}" title="View Details & Recipient Open Log">
+                <i class="fa-solid fa-chart-simple"></i>
+              </button>
+              <a href="/api/campaigns/${c.id}/download-original" class="btn-action-icon" title="Download Original Excel" download>
+                <i class="fa-solid fa-file-excel"></i>
+              </a>
+              <a href="/api/campaigns/${c.id}/export-analytics" class="btn-action-icon" title="Export Analytics Report (.xlsx)" download>
+                <i class="fa-solid fa-file-export"></i>
+              </a>
+              <button class="btn-action-icon btn-delete" data-id="${c.id}" title="Delete Record">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    // Attach Event Listeners to actions
+    historyTableBody.querySelectorAll('.btn-view-detail').forEach((btn) => {
+      btn.addEventListener('click', () => openCampaignDetailModal(btn.getAttribute('data-id')));
+    });
+
+    historyTableBody.querySelectorAll('.btn-delete').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-id');
+        if (confirm('Are you sure you want to permanently delete this campaign dump record?')) {
+          try {
+            const res = await fetch(`/api/campaigns/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+              showToast('Campaign record deleted successfully', 'success');
+              loadAnalyticsData();
+            }
+          } catch (err) {
+            showToast('Failed to delete campaign', 'error');
+          }
+        }
+      });
+    });
+  }
+
+  historyFilterBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      historyFilterBtns.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderHistoricalCampaignsTable();
+    });
+  });
+
+  if (campaignSearchInput) {
+    campaignSearchInput.addEventListener('input', renderHistoricalCampaignsTable);
+  }
+
+  if (btnRefreshAnalytics) {
+    btnRefreshAnalytics.addEventListener('click', async () => {
+      btnRefreshAnalytics.innerHTML = '<i class="fa-solid fa-rotate fa-spin"></i> Refreshing...';
+      await loadAnalyticsData();
+      btnRefreshAnalytics.innerHTML = '<i class="fa-solid fa-rotate"></i> Refresh Data';
+      showToast('Analytics refreshed!', 'info');
+    });
+  }
+
+  // ----------------------------------------------------
+  // CAMPAIGN DETAIL MODAL LOGIC (3 TABS)
+  // ----------------------------------------------------
+  async function openCampaignDetailModal(campaignId) {
+    // Reset tabs to Tab 1 (Recipients)
+    modalTabs.forEach((t) => t.classList.remove('active'));
+    modalTabPanes.forEach((p) => (p.style.display = 'none'));
+    const firstTab = document.querySelector('.modal-tab-btn[data-tab="tabRecipients"]');
+    if (firstTab) firstTab.classList.add('active');
+    const firstPane = document.getElementById('tabRecipients');
+    if (firstPane) firstPane.style.display = 'block';
+
+    // Reset filter
+    state.analytics.currentDetailFilter = 'all';
+    modalRecipFilterBtns.forEach((b) => b.classList.toggle('active', b.getAttribute('data-recip-filter') === 'all'));
+    if (modalRecipientSearch) modalRecipientSearch.value = '';
+
+    campaignDetailModal.classList.add('active');
+    modalCampaignName.textContent = 'Loading Campaign...';
+    modalRecipientsTableBody.innerHTML = `<tr><td colspan="7" class="text-center py-4"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading recipient engagement data...</td></tr>`;
+
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}`);
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        state.analytics.currentDetailCampaign = data.campaign;
+        renderCampaignDetailModal(data.campaign);
+      } else {
+        throw new Error(data.error || 'Failed to load details');
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+      campaignDetailModal.classList.remove('active');
+    }
+  }
+
+  function renderCampaignDetailModal(c) {
+    modalCampaignName.textContent = c.name;
+    const dateFormatted = new Date(c.created_at).toLocaleString();
+    modalCampaignMeta.textContent = `Created: ${dateFormatted} • Stored File: ${c.original_filename || 'recipients.xlsx'}`;
+
+    modalMetricTotal.textContent = (c.total_recipients || 0).toLocaleString();
+    modalMetricSent.textContent = (c.sent_count || 0).toLocaleString();
+    modalMetricOpened.textContent = (c.opened_count || 0).toLocaleString();
+    modalMetricUnseen.textContent = (c.unseen_count !== undefined ? c.unseen_count : (c.total_recipients - c.opened_count)).toLocaleString();
+    modalMetricOpenRate.textContent = `${c.open_rate_pct || 0}%`;
+    modalMetricFailed.textContent = (c.failed_count || 0).toLocaleString();
+
+    // Tab 1: Counts for filter pills
+    const all = c.recipients || [];
+    const seen = all.filter((r) => r.is_opened === 1);
+    const unseen = all.filter((r) => r.is_opened === 0);
+    const failed = all.filter((r) => r.send_status === 'failed');
+
+    if (countFilterAll) countFilterAll.textContent = all.length;
+    if (countFilterSeen) countFilterSeen.textContent = seen.length;
+    if (countFilterUnseen) countFilterUnseen.textContent = unseen.length;
+    if (countFilterFailed) countFilterFailed.textContent = failed.length;
+
+    renderModalRecipientsTable();
+
+    // Tab 2: Content Sent
+    modalEmailSubject.textContent = c.subject || '(No subject)';
+    modalEmailSender.textContent = c.smtp_from || '(Default Sender)';
+    modalEmailAttachments.textContent = (c.attachmentNames && c.attachmentNames.length > 0)
+      ? c.attachmentNames.join(', ')
+      : 'None';
+    modalEmailHtmlBody.innerHTML = c.html_body || `<pre style="white-space: pre-wrap;">${c.text_body || ''}</pre>`;
+
+    // Tab 3: Downloads
+    btnDownloadOriginalExcel.href = `/api/campaigns/${c.id}/download-original`;
+    btnDownloadAnalyticsReport.href = `/api/campaigns/${c.id}/export-analytics`;
+  }
+
+  function renderModalRecipientsTable() {
+    const c = state.analytics.currentDetailCampaign;
+    if (!c || !c.recipients) return;
+
+    const filter = state.analytics.currentDetailFilter || 'all';
+    const search = (modalRecipientSearch ? modalRecipientSearch.value : '').toLowerCase().trim();
+
+    let recipients = c.recipients;
+
+    if (filter === 'seen') recipients = recipients.filter((r) => r.is_opened === 1);
+    if (filter === 'unseen') recipients = recipients.filter((r) => r.is_opened === 0);
+    if (filter === 'failed') recipients = recipients.filter((r) => r.send_status === 'failed');
+
+    if (search) {
+      recipients = recipients.filter((r) =>
+        (r.email || '').toLowerCase().includes(search) ||
+        (r.name || '').toLowerCase().includes(search)
+      );
+    }
+
+    if (recipients.length === 0) {
+      modalRecipientsTableBody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">No recipients match the selected filter.</td></tr>`;
+      return;
+    }
+
+    modalRecipientsTableBody.innerHTML = recipients.map((r) => {
+      const isOpened = r.is_opened === 1;
+      const openedAtFormatted = r.opened_at ? new Date(r.opened_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--';
+
+      let sendStatusBadge = `<span class="badge-cell valid">SENT</span>`;
+      if (r.send_status === 'failed') {
+        sendStatusBadge = `<span class="badge-cell invalid" title="${r.error_message || ''}">FAILED</span>`;
+      } else if (r.send_status === 'pending') {
+        sendStatusBadge = `<span class="badge-cell">PENDING</span>`;
+      }
+
+      const seenStatusBadge = isOpened
+        ? `<span class="badge-seen"><i class="fa-solid fa-eye"></i> SEEN</span>`
+        : `<span class="badge-unseen"><i class="fa-solid fa-eye-slash"></i> UNSEEN</span>`;
+
+      return `
+        <tr>
+          <td>${r.recipient_index}</td>
+          <td><strong>${r.email}</strong></td>
+          <td>${r.name || '--'}</td>
+          <td>${sendStatusBadge}</td>
+          <td>${seenStatusBadge}</td>
+          <td><small>${openedAtFormatted}</small></td>
+          <td><span class="font-bold">${r.open_count || 0}</span></td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // Modal Tabs Switching Listener
+  modalTabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      modalTabs.forEach((t) => t.classList.remove('active'));
+      modalTabPanes.forEach((p) => (p.style.display = 'none'));
+
+      tab.classList.add('active');
+      const target = tab.getAttribute('data-tab');
+      const targetPane = document.getElementById(target);
+      if (targetPane) targetPane.style.display = 'block';
+    });
+  });
+
+  // Modal Recipient Filter Pills
+  modalRecipFilterBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      modalRecipFilterBtns.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.analytics.currentDetailFilter = btn.getAttribute('data-recip-filter');
+      renderModalRecipientsTable();
+    });
+  });
+
+  if (modalRecipientSearch) {
+    modalRecipientSearch.addEventListener('input', renderModalRecipientsTable);
+  }
+
+  if (btnCloseDetailModal) {
+    btnCloseDetailModal.addEventListener('click', () => campaignDetailModal.classList.remove('active'));
+  }
+  if (btnCloseDetailModalFooter) {
+    btnCloseDetailModalFooter.addEventListener('click', () => campaignDetailModal.classList.remove('active'));
+  }
+
+  // ----------------------------------------------------
+  // INTERACTIVE KPI BUTTONS & RECORDS MODAL LOGIC
+  // ----------------------------------------------------
+  const kpiBtnDumps = document.getElementById('kpiBtnDumps');
+  const kpiBtnDispatched = document.getElementById('kpiBtnDispatched');
+  const kpiBtnSeen = document.getElementById('kpiBtnSeen');
+  const kpiBtnUnseen = document.getElementById('kpiBtnUnseen');
+
+  const kpiDetailModal = document.getElementById('kpiDetailModal');
+  const btnCloseKpiModal = document.getElementById('btnCloseKpiModal');
+  const btnCloseKpiModalFooter = document.getElementById('btnCloseKpiModalFooter');
+  const kpiModalIcon = document.getElementById('kpiModalIcon');
+  const kpiModalTitle = document.getElementById('kpiModalTitle');
+  const kpiModalSubtitle = document.getElementById('kpiModalSubtitle');
+  const kpiModalSearch = document.getElementById('kpiModalSearch');
+  const btnCopyKpiEmails = document.getElementById('btnCopyKpiEmails');
+  const btnExportKpiCsv = document.getElementById('btnExportKpiCsv');
+  const kpiModalTableHead = document.getElementById('kpiModalTableHead');
+  const kpiModalTableBody = document.getElementById('kpiModalTableBody');
+
+  let currentKpiType = 'dumps';
+  let currentKpiRows = [];
+
+  if (kpiBtnDumps) {
+    kpiBtnDumps.addEventListener('click', () => openKpiDetailModal('dumps'));
+  }
+  if (kpiBtnDispatched) {
+    kpiBtnDispatched.addEventListener('click', () => openKpiDetailModal('dispatched'));
+  }
+  if (kpiBtnSeen) {
+    kpiBtnSeen.addEventListener('click', () => openKpiDetailModal('seen'));
+  }
+  if (kpiBtnUnseen) {
+    kpiBtnUnseen.addEventListener('click', () => openKpiDetailModal('unseen'));
+  }
+
+  async function openKpiDetailModal(type) {
+    currentKpiType = type;
+    if (kpiModalSearch) kpiModalSearch.value = '';
+    kpiDetailModal.classList.add('active');
+
+    // Configure header based on KPI Type
+    if (type === 'dumps') {
+      kpiModalIcon.className = 'modal-icon-badge bg-purple';
+      kpiModalIcon.innerHTML = '<i class="fa-solid fa-folder-tree"></i>';
+      kpiModalTitle.textContent = 'Stored Email Dumps & Spreadsheets Records';
+      kpiModalSubtitle.textContent = 'All archived campaigns with their original Excel files and email content';
+      btnCopyKpiEmails.style.display = 'none';
+      
+      currentKpiRows = state.analytics.campaigns || [];
+      renderKpiTable();
+    } else {
+      btnCopyKpiEmails.style.display = 'inline-flex';
+      let iconClass = 'bg-blue';
+      let iconHtml = '<i class="fa-solid fa-paper-plane"></i>';
+      let title = 'All Dispatched Email Records';
+      let subtitle = 'Individual recipients dispatched across all campaigns';
+
+      if (type === 'seen') {
+        iconClass = 'bg-green';
+        iconHtml = '<i class="fa-solid fa-eye"></i>';
+        title = 'All Seen (Opened) Email Activity';
+        subtitle = 'Recipients who have successfully opened your emails with timestamp audit';
+      } else if (type === 'unseen') {
+        iconClass = 'bg-amber';
+        iconHtml = '<i class="fa-solid fa-envelope-open-text"></i>';
+        title = 'All Unseen (Unopened) Email Recipients';
+        subtitle = 'Recipients pending open engagement';
+      }
+
+      kpiModalIcon.className = `modal-icon-badge ${iconClass}`;
+      kpiModalIcon.innerHTML = iconHtml;
+      kpiModalTitle.textContent = title;
+      kpiModalSubtitle.textContent = 'Loading records from SQLite database...';
+
+      kpiModalTableHead.innerHTML = `<tr><th>#</th><th>Recipient Email</th><th>Name</th><th>Campaign / Dump</th><th>Timestamp</th><th>Status</th><th>Action</th></tr>`;
+      kpiModalTableBody.innerHTML = `<tr><td colspan="7" class="text-center py-5"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading records...</td></tr>`;
+
+      try {
+        const res = await fetch(`/api/analytics/recipients?type=${type}`);
+        const data = await res.json();
+        if (res.ok && data.success) {
+          currentKpiRows = data.recipients || [];
+          kpiModalSubtitle.textContent = `Found ${currentKpiRows.length.toLocaleString()} records stored in SQLite`;
+          renderKpiTable();
+        } else {
+          throw new Error(data.error || 'Failed to fetch records');
+        }
+      } catch (err) {
+        showToast(err.message, 'error');
+        kpiModalTableBody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">${err.message}</td></tr>`;
+      }
+    }
+  }
+
+  function renderKpiTable() {
+    const search = (kpiModalSearch ? kpiModalSearch.value : '').toLowerCase().trim();
+
+    if (currentKpiType === 'dumps') {
+      kpiModalTableHead.innerHTML = `
+        <tr>
+          <th>#</th>
+          <th>Dump / Campaign Name</th>
+          <th>Created At</th>
+          <th>Stored Excel File</th>
+          <th>Recipients</th>
+          <th>Dispatched</th>
+          <th>Seen (Opened)</th>
+          <th>Unseen</th>
+          <th style="text-align: right;">Actions</th>
+        </tr>
+      `;
+
+      let rows = currentKpiRows;
+      if (search) {
+        rows = rows.filter((c) =>
+          (c.name || '').toLowerCase().includes(search) ||
+          (c.original_filename || '').toLowerCase().includes(search) ||
+          (c.subject || '').toLowerCase().includes(search)
+        );
+      }
+
+      if (rows.length === 0) {
+        kpiModalTableBody.innerHTML = `<tr><td colspan="9" class="text-center py-5 text-muted">No campaign dump records found.</td></tr>`;
+        return;
+      }
+
+      kpiModalTableBody.innerHTML = rows.map((c, i) => {
+        const dateFormatted = new Date(c.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+        const unseen = c.unseen_count !== undefined ? c.unseen_count : (c.total_recipients - c.opened_count);
+        return `
+          <tr>
+            <td>${i + 1}</td>
+            <td>
+              <strong>${c.name}</strong>
+              <br><small class="text-accent">${c.subject || 'No subject'}</small>
+            </td>
+            <td><small>${dateFormatted}</small></td>
+            <td>
+              <span class="badge-cell" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+                <i class="fa-solid fa-file-excel"></i> ${c.original_filename || 'recipients.xlsx'}
+              </span>
+            </td>
+            <td><strong>${c.total_recipients.toLocaleString()}</strong></td>
+            <td><span class="text-success font-bold">${c.sent_count.toLocaleString()}</span></td>
+            <td><span class="badge-seen"><i class="fa-solid fa-eye"></i> ${c.opened_count.toLocaleString()}</span></td>
+            <td><span class="badge-unseen"><i class="fa-solid fa-eye-slash"></i> ${unseen.toLocaleString()}</span></td>
+            <td>
+              <div class="table-actions-cell">
+                <button class="btn btn-outline btn-sm btn-view-from-kpi" data-id="${c.id}" title="View Email Content & Details">
+                  <i class="fa-regular fa-envelope"></i> Content
+                </button>
+                <a href="/api/campaigns/${c.id}/download-original" class="btn btn-secondary btn-sm" title="Download Excel" download>
+                  <i class="fa-solid fa-download"></i> Excel
+                </a>
+                <a href="/api/campaigns/${c.id}/export-analytics" class="btn btn-primary btn-sm" title="Export Full Report" download>
+                  <i class="fa-solid fa-file-export"></i> Report
+                </a>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      kpiModalTableBody.querySelectorAll('.btn-view-from-kpi').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          kpiDetailModal.classList.remove('active');
+          openCampaignDetailModal(btn.getAttribute('data-id'));
+        });
+      });
+
+    } else {
+      // Dispatched, Seen, or Unseen Recipient Records
+      kpiModalTableHead.innerHTML = `
+        <tr>
+          <th>#</th>
+          <th>Recipient Email</th>
+          <th>Name</th>
+          <th>Campaign Dump Name</th>
+          <th>${currentKpiType === 'seen' ? 'First Opened At' : 'Dispatched At'}</th>
+          <th>${currentKpiType === 'seen' ? 'Open Count' : 'Engagement Status'}</th>
+          <th style="text-align: right;">Action</th>
+        </tr>
+      `;
+
+      let rows = currentKpiRows;
+      if (search) {
+        rows = rows.filter((r) =>
+          (r.email || '').toLowerCase().includes(search) ||
+          (r.name || '').toLowerCase().includes(search) ||
+          (r.campaign_name || '').toLowerCase().includes(search) ||
+          (r.campaign_subject || '').toLowerCase().includes(search)
+        );
+      }
+
+      if (rows.length === 0) {
+        kpiModalTableBody.innerHTML = `<tr><td colspan="7" class="text-center py-5 text-muted">No matching records found.</td></tr>`;
+        return;
+      }
+
+      kpiModalTableBody.innerHTML = rows.map((r, i) => {
+        const timeVal = currentKpiType === 'seen' ? r.opened_at : (r.sent_at || r.campaign_created_at);
+        const timeFormatted = timeVal ? new Date(timeVal).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : '--';
+
+        let statusCol = `<span class="badge-seen"><i class="fa-solid fa-eye"></i> SEEN</span>`;
+        if (currentKpiType === 'seen') {
+          statusCol = `<span class="badge-seen font-bold">👁️ ${r.open_count || 1} Opens</span>`;
+        } else if (currentKpiType === 'unseen') {
+          statusCol = `<span class="badge-unseen"><i class="fa-solid fa-eye-slash"></i> UNSEEN</span>`;
+        } else {
+          statusCol = r.send_status === 'sent'
+            ? `<span class="badge-cell valid">SENT</span>`
+            : `<span class="badge-cell invalid">FAILED</span>`;
+        }
+
+        return `
+          <tr>
+            <td>${i + 1}</td>
+            <td><strong>${r.email}</strong></td>
+            <td>${r.name || '--'}</td>
+            <td>
+              <span class="text-accent font-bold">${r.campaign_name}</span>
+              <br><small class="text-muted">${r.campaign_subject || ''}</small>
+            </td>
+            <td><small>${timeFormatted}</small></td>
+            <td>${statusCol}</td>
+            <td>
+              <button class="btn btn-outline btn-sm btn-view-from-kpi" data-id="${r.campaign_id}" title="Inspect Campaign Dump">
+                <i class="fa-solid fa-folder-open"></i> Dump
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      kpiModalTableBody.querySelectorAll('.btn-view-from-kpi').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          kpiDetailModal.classList.remove('active');
+          openCampaignDetailModal(btn.getAttribute('data-id'));
+        });
+      });
+    }
+  }
+
+  if (kpiModalSearch) {
+    kpiModalSearch.addEventListener('input', renderKpiTable);
+  }
+
+  // Copy All Emails to Clipboard
+  if (btnCopyKpiEmails) {
+    btnCopyKpiEmails.addEventListener('click', () => {
+      const search = (kpiModalSearch ? kpiModalSearch.value : '').toLowerCase().trim();
+      let rows = currentKpiRows;
+      if (search) {
+        rows = rows.filter((r) =>
+          (r.email || '').toLowerCase().includes(search) ||
+          (r.name || '').toLowerCase().includes(search) ||
+          (r.campaign_name || '').toLowerCase().includes(search)
+        );
+      }
+
+      const emails = rows.map((r) => r.email).filter(Boolean);
+      if (emails.length === 0) {
+        showToast('No emails to copy.', 'error');
+        return;
+      }
+
+      navigator.clipboard.writeText(emails.join(', '));
+      showToast(`Copied ${emails.length.toLocaleString()} email addresses to clipboard! 📋`, 'success');
+    });
+  }
+
+  // Export CSV / Excel for the currently displayed KPI table
+  if (btnExportKpiCsv) {
+    btnExportKpiCsv.addEventListener('click', () => {
+      const search = (kpiModalSearch ? kpiModalSearch.value : '').toLowerCase().trim();
+      let rows = currentKpiRows;
+
+      if (currentKpiType === 'dumps') {
+        if (search) {
+          rows = rows.filter((c) =>
+            (c.name || '').toLowerCase().includes(search) ||
+            (c.original_filename || '').toLowerCase().includes(search)
+          );
+        }
+        let csvContent = 'data:text/csv;charset=utf-8,Dump_Name,Subject,Created_At,Original_Excel,Total_Recipients,Sent_Count,Opened_Count,Unseen_Count,Open_Rate_Pct\n';
+        rows.forEach((c) => {
+          const unseen = c.unseen_count !== undefined ? c.unseen_count : (c.total_recipients - c.opened_count);
+          csvContent += `"${(c.name||'').replace(/"/g, '""')}","${(c.subject||'').replace(/"/g, '""')}","${c.created_at}","${c.original_filename}",${c.total_recipients},${c.sent_count},${c.opened_count},${unseen},${c.open_rate_pct}%\n`;
+        });
+        triggerCsvDownload(csvContent, 'Stored_Email_Dumps_Report.csv');
+      } else {
+        if (search) {
+          rows = rows.filter((r) =>
+            (r.email || '').toLowerCase().includes(search) ||
+            (r.name || '').toLowerCase().includes(search) ||
+            (r.campaign_name || '').toLowerCase().includes(search)
+          );
+        }
+        let csvContent = 'data:text/csv;charset=utf-8,Index,Email,Name,Campaign_Dump_Name,Subject,Send_Status,Sent_At,Seen_Status,Opened_At,Open_Count\n';
+        rows.forEach((r, i) => {
+          const seenStr = r.is_opened === 1 ? 'SEEN' : 'UNSEEN';
+          csvContent += `${i + 1},"${r.email}","${(r.name||'').replace(/"/g, '""')}","${(r.campaign_name||'').replace(/"/g, '""')}","${(r.campaign_subject||'').replace(/"/g, '""')}","${r.send_status}","${r.sent_at||''}","${seenStr}","${r.opened_at||''}",${r.open_count||0}\n`;
+        });
+        triggerCsvDownload(csvContent, `${currentKpiType.toUpperCase()}_Recipients_Report.csv`);
+      }
+    });
+  }
+
+  function triggerCsvDownload(csvData, filename) {
+    const encodedUri = encodeURI(csvData);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    showToast(`Exported ${filename}!`, 'success');
+  }
+
+  if (btnCloseKpiModal) {
+    btnCloseKpiModal.addEventListener('click', () => kpiDetailModal.classList.remove('active'));
+  }
+  if (btnCloseKpiModalFooter) {
+    btnCloseKpiModalFooter.addEventListener('click', () => kpiDetailModal.classList.remove('active'));
+  }
+
+  // ----------------------------------------------------
+  // Documentation / Guide & Test Email Modals
+  // ----------------------------------------------------
+  if (btnHelpModal) btnHelpModal.addEventListener('click', () => helpModal.classList.add('active'));
+  if (btnCloseHelpModal) btnCloseHelpModal.addEventListener('click', () => helpModal.classList.remove('active'));
+
+  if (btnCloseTestModal) btnCloseTestModal.addEventListener('click', () => testEmailModal.classList.remove('active'));
+  if (btnCancelTestModal) btnCancelTestModal.addEventListener('click', () => testEmailModal.classList.remove('active'));
+
+  // Universal Modal Dismiss Handlers
+  document.querySelectorAll('.modal-backdrop').forEach((backdrop) => {
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) backdrop.classList.remove('active');
+    });
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal-backdrop').forEach((m) => m.classList.remove('active'));
+    }
+  });
+
+  // ----------------------------------------------------
+  // Theme Switching Logic
+  // ----------------------------------------------------
+  if (themeSelector) {
+    themeSelector.addEventListener('change', (e) => {
+      const theme = e.target.value;
+      document.body.setAttribute('data-theme', theme);
+      const isLight = theme.includes('light');
+      document.body.classList.toggle('light-theme', isLight);
+      document.body.classList.toggle('dark-theme', !isLight);
+      localStorage.setItem('automailer_theme', theme);
+    });
+  }
+
+  if (btnToggleMode) {
+    btnToggleMode.addEventListener('click', () => {
+      const isLight = document.body.classList.contains('light-theme');
+      const newTheme = isLight ? 'cosmic-aurora' : 'clean-light';
+      if (themeSelector) {
+        themeSelector.value = newTheme;
+        themeSelector.dispatchEvent(new Event('change'));
+      }
+    });
+  }
+
+  // Load Saved Theme
+  const savedTheme = localStorage.getItem('automailer_theme');
+  if (savedTheme && themeSelector) {
+    themeSelector.value = savedTheme;
+    themeSelector.dispatchEvent(new Event('change'));
+  }
+
+  // Initialize SSE and initial analytics count
+  initSSE();
+  loadAnalyticsData();
 });
+
+
